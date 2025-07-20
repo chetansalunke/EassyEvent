@@ -2,8 +2,16 @@
 
 // Determine API base URL based on environment
 const API_BASE_URL = __DEV__
-  ? 'http://localhost:5000/api' // Development - your local backend
+  ? 'http://10.0.2.2:5000/api' // Development - Android emulator localhost (port 5000)
   : 'https://your-production-api.herokuapp.com/api'; // Production - replace with your deployed URL
+
+// Alternative URLs for development testing
+export const DEV_URLS = {
+  LOCALHOST: 'http://localhost:5000/api',
+  ANDROID_EMULATOR: 'http://10.0.2.2:5000/api',
+  IOS_SIMULATOR: 'http://localhost:5000/api',
+  YOUR_LOCAL_IP: 'http://192.168.1.100:5000/api', // Replace with your actual IP
+};
 
 export const API_ENDPOINTS = {
   // Authentication endpoints
@@ -28,8 +36,8 @@ export const API_ENDPOINTS = {
 };
 
 export const API_CONFIG = {
-  TIMEOUT: 30000, // 30 seconds
-  RETRY_ATTEMPTS: 3,
+  TIMEOUT: 15000, // 15 seconds (reduced from 30)
+  RETRY_ATTEMPTS: 2, // Reduced from 3
   RETRY_DELAY: 1000, // 1 second
 };
 

@@ -289,7 +289,7 @@ export const removeToken = async () => {
 // Request timeout configuration
 export const REQUEST_TIMEOUT = API_CONFIG.TIMEOUT;
 
-// Network status checker
+//  status checker
 export const checkNetworkStatus = async () => {
   try {
     const controller = new AbortController();

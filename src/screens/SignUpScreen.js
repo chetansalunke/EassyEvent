@@ -17,15 +17,27 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { colors } from '../utils/colors';
 import { authAPI } from '../services/api';
 import {
-  INDIAN_STATES,
-  INDIAN_CITIES,
-  getCitiesByState,
-} from '../constants/data';
-import {
   validateForm,
   validationRules,
   formatValidation,
 } from '../utils/validation';
+
+// Simple static data for states and cities
+const SIMPLE_STATES = [
+  'Maharashtra',
+  'Karnataka',
+  'Tamil Nadu',
+  'Gujarat',
+  'Delhi',
+];
+
+const SIMPLE_CITIES = [
+  'Mumbai',
+  'Bangalore',
+  'Chennai',
+  'Ahmedabad',
+  'New Delhi',
+];
 
 const SignUpScreen = ({ navigation }) => {
   const [formData, setFormData] = useState({
@@ -46,10 +58,10 @@ const SignUpScreen = ({ navigation }) => {
   const [errors, setErrors] = useState({});
   const [showCityModal, setShowCityModal] = useState(false);
   const [showStateModal, setShowStateModal] = useState(false);
-  const [availableCities, setAvailableCities] = useState([]);
 
   // Refs for PIN code inputs
   const pinRefs = useRef([]);
+
   const validateFormData = () => {
     const formRules = {
       email: validationRules.email,
@@ -92,33 +104,48 @@ const SignUpScreen = ({ navigation }) => {
   };
 
   const handleSignUp = async () => {
-    if (!validateFormData()) return;
+    if (!validateFormData()) {
+      console.log('Form validation failed', errors);
+      return;
+    }
 
     setIsLoading(true);
 
     try {
       // Prepare data for API (matching your backend expected format)
       const userData = {
-        email: formatValidation.formatEmail(formData.email),
-        name: formData.name.trim(),
-        addressLine1: formData.addressLine1.trim(),
-        addressLine2: formData.addressLine2.trim(),
-        city: formData.city,
-        state: formData.state,
-        pinCode: formData.pinCode.join(''),
-        seatingCapacity: formData.seatingCapacity,
+        email: formData.email.toLowerCase().trim(),
+        businessName: formData.name.trim(),
+        address: {
+          line1: formData.addressLine1.trim(),
+          line2: formData.addressLine2.trim(),
+          city: formData.city,
+          state: formData.state,
+          pinCode: formData.pinCode.join(''),
+        },
+        seatingCapacity: parseInt(formData.seatingCapacity),
         password: formData.password,
       };
 
-      console.log('Sending signup data:', userData); // Debug log
+      console.log('Sending signup data:', userData);
 
-      // Call registration API
-      const result = await authAPI.signup(userData);
+      // Direct API call to your backend
+      const response = await fetch('http://10.0.2.2:5000/api/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData),
+      });
 
-      if (result.success) {
+      const result = await response.json();
+      console.log('API response:', result);
+
+      if (response.ok && result.status === 'success') {
         Alert.alert(
           'Registration Successful!',
-          'Your account has been created successfully. Please check your email to verify your account before logging in.',
+          result.message ||
+            'Your account has been created successfully. Please check your email to verify your account.',
           [
             {
               text: 'OK',
@@ -127,28 +154,17 @@ const SignUpScreen = ({ navigation }) => {
           ],
         );
       } else {
-        // Handle specific error cases
-        let errorMessage =
-          result.error || 'Registration failed. Please try again.';
-
-        if (result.errors && result.errors.length > 0) {
-          errorMessage = result.errors.join('\n');
-        }
-
-        if (result.status === 409) {
-          errorMessage =
-            'An account with this email already exists. Please use a different email or try logging in.';
-        } else if (result.status === 400) {
-          errorMessage = 'Please check your information and try again.';
-        }
-
+        // Handle error response
+        const errorMessage =
+          result.message || 'Registration failed. Please try again.';
+        console.log('Registration error:', errorMessage);
         Alert.alert('Registration Failed', errorMessage);
       }
     } catch (error) {
       console.error('Signup error:', error);
       Alert.alert(
         'Registration Failed',
-        'Something went wrong. Please check your internet connection and try again.',
+        'Network error. Please check your internet connection and try again.',
       );
     } finally {
       setIsLoading(false);
@@ -190,6 +206,7 @@ const SignUpScreen = ({ navigation }) => {
 
   // Handle dropdown selections
   const selectCity = city => {
+    console.log('Selected city:', city); // Debug log
     setFormData(prev => ({ ...prev, city }));
     setShowCityModal(false);
     if (errors.city) {
@@ -198,34 +215,36 @@ const SignUpScreen = ({ navigation }) => {
   };
 
   const selectState = state => {
+    console.log('Selected state:', state); // Debug log
     setFormData(prev => ({
       ...prev,
       state,
-      city: '', // Reset city when state changes
+      // Don't reset city since we're using independent dropdowns
     }));
-
-    // Update available cities based on selected state
-    const stateCities = getCitiesByState(state);
-    setAvailableCities(stateCities.length > 0 ? stateCities : INDIAN_CITIES);
 
     setShowStateModal(false);
     if (errors.state) {
       setErrors(prev => ({ ...prev, state: null }));
     }
-    // Clear city error as well since we reset the city
-    if (errors.city) {
-      setErrors(prev => ({ ...prev, city: null }));
-    }
   };
 
   // Render dropdown modal
   const renderDropdownModal = (visible, onClose, data, onSelect, title) => (
-    <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.modalOverlay}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <TouchableOpacity
+        style={styles.modalOverlay}
+        activeOpacity={1}
+        onPress={onClose}
+      >
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{title}</Text>
-            <TouchableOpacity onPress={onClose}>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Ionicons name="close" size={24} color={colors.secondary} />
             </TouchableOpacity>
           </View>
@@ -236,7 +255,11 @@ const SignUpScreen = ({ navigation }) => {
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={styles.modalItem}
-                  onPress={() => onSelect(item)}
+                  onPress={() => {
+                    console.log('Item selected:', item); // Debug log
+                    onSelect(item);
+                  }}
+                  activeOpacity={0.7}
                 >
                   <Text style={styles.modalItemText}>{item}</Text>
                 </TouchableOpacity>
@@ -245,15 +268,11 @@ const SignUpScreen = ({ navigation }) => {
             />
           ) : (
             <View style={styles.noDataContainer}>
-              <Text style={styles.noDataText}>
-                {title === 'Select City'
-                  ? 'Please select a state first to see available cities'
-                  : 'No data available'}
-              </Text>
+              <Text style={styles.noDataText}>No data available</Text>
             </View>
           )}
         </View>
-      </View>
+      </TouchableOpacity>
     </Modal>
   );
 
@@ -343,34 +362,19 @@ const SignUpScreen = ({ navigation }) => {
                   styles.input,
                   styles.dropdown,
                   errors.city && styles.inputError,
-                  !formData.state && styles.disabledDropdown,
                 ]}
                 onPress={() => {
-                  if (!formData.state) {
-                    Alert.alert(
-                      'Select State First',
-                      'Please select a state before choosing a city.',
-                    );
-                    return;
-                  }
+                  console.log('City dropdown pressed'); // Debug log
                   setShowCityModal(true);
                 }}
-                disabled={!formData.state}
+                activeOpacity={0.7}
               >
                 <Text
-                  style={[
-                    formData.city ? styles.inputText : styles.placeholder,
-                    !formData.state && styles.disabledText,
-                  ]}
+                  style={formData.city ? styles.inputText : styles.placeholder}
                 >
-                  {formData.city ||
-                    (formData.state ? 'Select the city' : 'Select state first')}
+                  {formData.city || 'Select the city'}
                 </Text>
-                <Ionicons
-                  name="chevron-down"
-                  size={20}
-                  color={!formData.state ? colors.lightGray : colors.gray}
-                />
+                <Ionicons name="chevron-down" size={20} color={colors.gray} />
               </TouchableOpacity>
               {errors.city && (
                 <Text style={styles.errorText}>{errors.city}</Text>
@@ -385,7 +389,11 @@ const SignUpScreen = ({ navigation }) => {
                   styles.dropdown,
                   errors.state && styles.inputError,
                 ]}
-                onPress={() => setShowStateModal(true)}
+                onPress={() => {
+                  console.log('State dropdown pressed'); // Debug log
+                  setShowStateModal(true);
+                }}
+                activeOpacity={0.7}
               >
                 <Text
                   style={formData.state ? styles.inputText : styles.placeholder}
@@ -551,7 +559,7 @@ const SignUpScreen = ({ navigation }) => {
           {renderDropdownModal(
             showCityModal,
             () => setShowCityModal(false),
-            availableCities,
+            SIMPLE_CITIES,
             selectCity,
             'Select City',
           )}
@@ -559,7 +567,7 @@ const SignUpScreen = ({ navigation }) => {
           {renderDropdownModal(
             showStateModal,
             () => setShowStateModal(false),
-            INDIAN_STATES,
+            SIMPLE_STATES,
             selectState,
             'Select State',
           )}
@@ -808,6 +816,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: colors.secondary,
+  },
+  closeButton: {
+    padding: 4,
+    borderRadius: 20,
   },
   modalItem: {
     paddingHorizontal: 20,
