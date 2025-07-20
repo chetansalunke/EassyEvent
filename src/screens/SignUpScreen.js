@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,9 +9,23 @@ import {
   ActivityIndicator,
   StyleSheet,
   SafeAreaView,
+  Image,
+  Modal,
+  FlatList,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { colors } from '../utils/colors';
+import { authAPI } from '../services/api';
+import {
+  INDIAN_STATES,
+  INDIAN_CITIES,
+  getCitiesByState,
+} from '../constants/data';
+import {
+  validateForm,
+  validationRules,
+  formatValidation,
+} from '../utils/validation';
 
 const SignUpScreen = ({ navigation }) => {
   const [formData, setFormData] = useState({
@@ -21,7 +35,7 @@ const SignUpScreen = ({ navigation }) => {
     addressLine2: '',
     city: '',
     state: '',
-    pinCode: '',
+    pinCode: ['', '', '', '', '', ''],
     seatingCapacity: '',
     password: '',
     confirmPassword: '',
@@ -30,37 +44,115 @@ const SignUpScreen = ({ navigation }) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [showCityModal, setShowCityModal] = useState(false);
+  const [showStateModal, setShowStateModal] = useState(false);
+  const [availableCities, setAvailableCities] = useState([]);
 
-  const validateForm = () => {
-    const newErrors = {};
+  // Refs for PIN code inputs
+  const pinRefs = useRef([]);
+  const validateFormData = () => {
+    const formRules = {
+      email: validationRules.email,
+      name: validationRules.name,
+      addressLine1: {
+        required: true,
+        minLength: 5,
+        message: 'Please enter a complete address',
+      },
+      city: { required: true, message: 'City is required' },
+      state: { required: true, message: 'State is required' },
+      seatingCapacity: validationRules.seatingCapacity,
+      password: validationRules.password,
+    };
 
-    if (!formData.email) newErrors.email = 'Email is required';
-    if (!formData.name) newErrors.name = 'Name is required';
-    if (!formData.addressLine1) newErrors.addressLine1 = 'Address is required';
-    if (!formData.city) newErrors.city = 'City is required';
-    if (!formData.state) newErrors.state = 'State is required';
-    if (!formData.pinCode) newErrors.pinCode = 'PIN Code is required';
-    if (!formData.seatingCapacity)
-      newErrors.seatingCapacity = 'Seating capacity is required';
-    if (!formData.password) newErrors.password = 'Password is required';
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
+    const { isValid, errors: formErrors } = validateForm(formData, formRules);
+
+    // Custom validation for PIN code
+    const pinCode = formData.pinCode.join('');
+    if (pinCode.length !== 6 || !/^\d{6}$/.test(pinCode)) {
+      formErrors.pinCode = 'PIN Code must be exactly 6 digits';
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    // Custom validation for confirm password
+    if (!formData.confirmPassword) {
+      formErrors.confirmPassword = 'Please confirm your password';
+    } else if (formData.password !== formData.confirmPassword) {
+      formErrors.confirmPassword = 'Passwords do not match';
+    }
+
+    // Custom validation for seating capacity
+    const capacity = parseInt(formData.seatingCapacity);
+    if (!capacity || capacity < 1 || capacity > 10000) {
+      formErrors.seatingCapacity =
+        'Seating capacity must be between 1 and 10,000';
+    }
+
+    setErrors(formErrors);
+    return Object.keys(formErrors).length === 0;
   };
 
   const handleSignUp = async () => {
-    if (!validateForm()) return;
+    if (!validateFormData()) return;
 
     setIsLoading(true);
-    setTimeout(() => {
+
+    try {
+      // Prepare data for API (matching your backend expected format)
+      const userData = {
+        email: formatValidation.formatEmail(formData.email),
+        name: formData.name.trim(),
+        addressLine1: formData.addressLine1.trim(),
+        addressLine2: formData.addressLine2.trim(),
+        city: formData.city,
+        state: formData.state,
+        pinCode: formData.pinCode.join(''),
+        seatingCapacity: formData.seatingCapacity,
+        password: formData.password,
+      };
+
+      console.log('Sending signup data:', userData); // Debug log
+
+      // Call registration API
+      const result = await authAPI.signup(userData);
+
+      if (result.success) {
+        Alert.alert(
+          'Registration Successful!',
+          'Your account has been created successfully. Please check your email to verify your account before logging in.',
+          [
+            {
+              text: 'OK',
+              onPress: () => navigation.navigate('Login'),
+            },
+          ],
+        );
+      } else {
+        // Handle specific error cases
+        let errorMessage =
+          result.error || 'Registration failed. Please try again.';
+
+        if (result.errors && result.errors.length > 0) {
+          errorMessage = result.errors.join('\n');
+        }
+
+        if (result.status === 409) {
+          errorMessage =
+            'An account with this email already exists. Please use a different email or try logging in.';
+        } else if (result.status === 400) {
+          errorMessage = 'Please check your information and try again.';
+        }
+
+        Alert.alert('Registration Failed', errorMessage);
+      }
+    } catch (error) {
+      console.error('Signup error:', error);
+      Alert.alert(
+        'Registration Failed',
+        'Something went wrong. Please check your internet connection and try again.',
+      );
+    } finally {
       setIsLoading(false);
-      Alert.alert('Success', 'Account created successfully!', [
-        { text: 'OK', onPress: () => navigation.navigate('Login') },
-      ]);
-    }, 1500);
+    }
   };
 
   const updateFormData = (field, value) => {
@@ -69,6 +161,101 @@ const SignUpScreen = ({ navigation }) => {
       setErrors(prev => ({ ...prev, [field]: null }));
     }
   };
+
+  // Handle PIN code input
+  const handlePinChange = (index, value) => {
+    if (value.length <= 1 && /^\d*$/.test(value)) {
+      const newPinCode = [...formData.pinCode];
+      newPinCode[index] = value;
+      setFormData(prev => ({ ...prev, pinCode: newPinCode }));
+
+      // Auto-focus next input
+      if (value && index < 5) {
+        pinRefs.current[index + 1]?.focus();
+      }
+
+      // Clear PIN code error when user starts typing
+      if (errors.pinCode) {
+        setErrors(prev => ({ ...prev, pinCode: null }));
+      }
+    }
+  };
+
+  // Handle PIN code backspace
+  const handlePinKeyPress = (index, key) => {
+    if (key === 'Backspace' && !formData.pinCode[index] && index > 0) {
+      pinRefs.current[index - 1]?.focus();
+    }
+  };
+
+  // Handle dropdown selections
+  const selectCity = city => {
+    setFormData(prev => ({ ...prev, city }));
+    setShowCityModal(false);
+    if (errors.city) {
+      setErrors(prev => ({ ...prev, city: null }));
+    }
+  };
+
+  const selectState = state => {
+    setFormData(prev => ({
+      ...prev,
+      state,
+      city: '', // Reset city when state changes
+    }));
+
+    // Update available cities based on selected state
+    const stateCities = getCitiesByState(state);
+    setAvailableCities(stateCities.length > 0 ? stateCities : INDIAN_CITIES);
+
+    setShowStateModal(false);
+    if (errors.state) {
+      setErrors(prev => ({ ...prev, state: null }));
+    }
+    // Clear city error as well since we reset the city
+    if (errors.city) {
+      setErrors(prev => ({ ...prev, city: null }));
+    }
+  };
+
+  // Render dropdown modal
+  const renderDropdownModal = (visible, onClose, data, onSelect, title) => (
+    <Modal visible={visible} transparent animationType="slide">
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>{title}</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={24} color={colors.secondary} />
+            </TouchableOpacity>
+          </View>
+          {data && data.length > 0 ? (
+            <FlatList
+              data={data}
+              keyExtractor={(item, index) => `${item}-${index}`}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.modalItem}
+                  onPress={() => onSelect(item)}
+                >
+                  <Text style={styles.modalItemText}>{item}</Text>
+                </TouchableOpacity>
+              )}
+              showsVerticalScrollIndicator={false}
+            />
+          ) : (
+            <View style={styles.noDataContainer}>
+              <Text style={styles.noDataText}>
+                {title === 'Select City'
+                  ? 'Please select a state first to see available cities'
+                  : 'No data available'}
+              </Text>
+            </View>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -84,28 +271,11 @@ const SignUpScreen = ({ navigation }) => {
             <Ionicons name="arrow-back" size={24} color={colors.secondary} />
           </TouchableOpacity>
           <View style={styles.logoContainer}>
-            <View style={styles.logoIcon}>
-              <View style={styles.logoPattern}>
-                <View
-                  style={[
-                    styles.logoDiamond,
-                    { transform: [{ rotate: '45deg' }] },
-                  ]}
-                />
-                <View
-                  style={[
-                    styles.logoDiamond,
-                    {
-                      transform: [{ rotate: '45deg' }],
-                      position: 'absolute',
-                      top: 8,
-                      left: 8,
-                    },
-                  ]}
-                />
-              </View>
-            </View>
-            <Text style={styles.logoText}>ENCALM</Text>
+            <Image
+              source={require('../../assets/logo.png')} // Update this path to your logo image
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
           </View>
         </View>
 
@@ -137,6 +307,7 @@ const SignUpScreen = ({ navigation }) => {
               value={formData.name}
               onChangeText={value => updateFormData('name', value)}
               placeholder="e.g., The Royal Orchid Banquets"
+              autoCorrect={false}
             />
             {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
           </View>
@@ -172,14 +343,34 @@ const SignUpScreen = ({ navigation }) => {
                   styles.input,
                   styles.dropdown,
                   errors.city && styles.inputError,
+                  !formData.state && styles.disabledDropdown,
                 ]}
+                onPress={() => {
+                  if (!formData.state) {
+                    Alert.alert(
+                      'Select State First',
+                      'Please select a state before choosing a city.',
+                    );
+                    return;
+                  }
+                  setShowCityModal(true);
+                }}
+                disabled={!formData.state}
               >
                 <Text
-                  style={formData.city ? styles.inputText : styles.placeholder}
+                  style={[
+                    formData.city ? styles.inputText : styles.placeholder,
+                    !formData.state && styles.disabledText,
+                  ]}
                 >
-                  {formData.city || 'Select the city'}
+                  {formData.city ||
+                    (formData.state ? 'Select the city' : 'Select state first')}
                 </Text>
-                <Ionicons name="chevron-down" size={20} color={colors.gray} />
+                <Ionicons
+                  name="chevron-down"
+                  size={20}
+                  color={!formData.state ? colors.lightGray : colors.gray}
+                />
               </TouchableOpacity>
               {errors.city && (
                 <Text style={styles.errorText}>{errors.city}</Text>
@@ -194,6 +385,7 @@ const SignUpScreen = ({ navigation }) => {
                   styles.dropdown,
                   errors.state && styles.inputError,
                 ]}
+                onPress={() => setShowStateModal(true)}
               >
                 <Text
                   style={formData.state ? styles.inputText : styles.placeholder}
@@ -214,10 +406,17 @@ const SignUpScreen = ({ navigation }) => {
               {[0, 1, 2, 3, 4, 5].map(index => (
                 <TextInput
                   key={index}
+                  ref={ref => (pinRefs.current[index] = ref)}
                   style={[styles.pinInput, errors.pinCode && styles.inputError]}
+                  value={formData.pinCode[index]}
+                  onChangeText={value => handlePinChange(index, value)}
+                  onKeyPress={({ nativeEvent }) =>
+                    handlePinKeyPress(index, nativeEvent.key)
+                  }
                   maxLength={1}
                   keyboardType="numeric"
                   textAlign="center"
+                  returnKeyType={index === 5 ? 'done' : 'next'}
                 />
               ))}
             </View>
@@ -239,7 +438,16 @@ const SignUpScreen = ({ navigation }) => {
                 placeholder="e.g., 250 guests"
                 keyboardType="numeric"
               />
-              <TouchableOpacity style={styles.capacityButton}>
+              <TouchableOpacity
+                style={styles.capacityButton}
+                onPress={() => {
+                  const currentValue = parseInt(formData.seatingCapacity) || 0;
+                  updateFormData(
+                    'seatingCapacity',
+                    (currentValue + 50).toString(),
+                  );
+                }}
+              >
                 <Ionicons name="add" size={20} color={colors.gray} />
               </TouchableOpacity>
             </View>
@@ -338,6 +546,23 @@ const SignUpScreen = ({ navigation }) => {
               Your credentials are securely encrypted
             </Text>
           </View>
+
+          {/* Modals for dropdowns */}
+          {renderDropdownModal(
+            showCityModal,
+            () => setShowCityModal(false),
+            availableCities,
+            selectCity,
+            'Select City',
+          )}
+
+          {renderDropdownModal(
+            showStateModal,
+            () => setShowStateModal(false),
+            INDIAN_STATES,
+            selectState,
+            'Select State',
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -376,28 +601,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 50,
   },
-  logoIcon: {
-    width: 80,
+  logoImage: {
+    width: 120,
     height: 80,
-    backgroundColor: colors.primary,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  logoPattern: {
-    position: 'relative',
-  },
-  logoDiamond: {
-    width: 20,
-    height: 20,
-    backgroundColor: colors.background,
-  },
-  logoText: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: colors.secondary,
-    letterSpacing: 2,
   },
   formContainer: {
     flex: 1,
@@ -451,6 +657,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  disabledDropdown: {
+    backgroundColor: colors.lightGray,
+    opacity: 0.6,
+  },
+  disabledText: {
+    color: colors.gray,
+    opacity: 0.7,
   },
   passwordContainer: {
     flexDirection: 'row',
@@ -569,6 +783,52 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.error,
     marginTop: 4,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '70%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.secondary,
+  },
+  modalItem: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.lightGray,
+  },
+  modalItemText: {
+    fontSize: 16,
+    color: colors.secondary,
+  },
+  noDataContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noDataText: {
+    fontSize: 16,
+    color: colors.gray,
+    textAlign: 'center',
+    lineHeight: 22,
   },
 });
 

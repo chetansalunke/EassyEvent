@@ -1,5 +1,12 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions, SafeAreaView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Dimensions,
+  SafeAreaView,
+  Image,
+} from 'react-native';
 import { colors } from '../utils/colors';
 
 const { width } = Dimensions.get('window');
@@ -18,28 +25,11 @@ const SplashScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       <View style={styles.splashContainer}>
         <View style={styles.logoContainer}>
-          <View style={styles.logoIcon}>
-            <View style={styles.logoPattern}>
-              <View
-                style={[
-                  styles.logoDiamond,
-                  { transform: [{ rotate: '45deg' }] },
-                ]}
-              />
-              <View
-                style={[
-                  styles.logoDiamond,
-                  {
-                    transform: [{ rotate: '45deg' }],
-                    position: 'absolute',
-                    top: 8,
-                    left: 8,
-                  },
-                ]}
-              />
-            </View>
-          </View>
-          <Text style={styles.logoText}>ENCALM</Text>
+          <Image
+            source={require('../../assets/logo.png')} // Update this path to your logo image
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
         </View>
         <View style={styles.loadingContainer}>
           <View style={styles.progressBar}>
@@ -66,28 +56,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 50,
   },
-  logoIcon: {
-    width: 80,
-    height: 80,
-    backgroundColor: colors.primary,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  logoPattern: {
-    position: 'relative',
-  },
-  logoDiamond: {
-    width: 20,
-    height: 20,
-    backgroundColor: colors.background,
-  },
-  logoText: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: colors.secondary,
-    letterSpacing: 2,
+  logoImage: {
+    width: 150,
+    height: 100,
   },
   loadingContainer: {
     position: 'absolute',

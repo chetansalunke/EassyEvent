@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   StyleSheet,
   SafeAreaView,
+  Image,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { colors } from '../utils/colors';
@@ -40,28 +41,11 @@ const LoginScreen = ({ navigation }) => {
       >
         <View style={styles.header}>
           <View style={styles.logoContainer}>
-            <View style={styles.logoIcon}>
-              <View style={styles.logoPattern}>
-                <View
-                  style={[
-                    styles.logoDiamond,
-                    { transform: [{ rotate: '45deg' }] },
-                  ]}
-                />
-                <View
-                  style={[
-                    styles.logoDiamond,
-                    {
-                      transform: [{ rotate: '45deg' }],
-                      position: 'absolute',
-                      top: 8,
-                      left: 8,
-                    },
-                  ]}
-                />
-              </View>
-            </View>
-            <Text style={styles.logoText}>ENCALM</Text>
+            <Image
+              source={require('../../assets/logo.png')} // Update this path to your logo image
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
           </View>
         </View>
 
@@ -168,28 +152,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 50,
   },
-  logoIcon: {
-    width: 80,
+  logoImage: {
+    width: 120,
     height: 80,
-    backgroundColor: colors.primary,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  logoPattern: {
-    position: 'relative',
-  },
-  logoDiamond: {
-    width: 20,
-    height: 20,
-    backgroundColor: colors.background,
-  },
-  logoText: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: colors.secondary,
-    letterSpacing: 2,
   },
   formContainer: {
     flex: 1,
