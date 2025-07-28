@@ -9,6 +9,8 @@ import LoginScreen from './src/screens/LoginScreen';
 import SignUpScreen from './src/screens/SignUpScreen';
 import ResetPasswordScreen from './src/screens/ResetPasswordScreen';
 import HomeScreen from './src/screens/HomeScreen';
+import EventsScreen from './src/screens/EventsScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
 import EditBookingScreen from './src/screens/EditBookingScreen';
 import DateTimePickerScreen from './src/screens/DateTimePickerScreen';
 
@@ -29,9 +31,17 @@ const AuthNavigator = () => {
     <Stack.Navigator
       initialRouteName={isAuthenticated ? 'Home' : 'Splash'}
       screenOptions={{
-        headerShown: false,
+        headerShown: false, // Default to no header
         animation: 'slide_from_right',
-        gestureEnabled: false, // Disable swipe back gesture for better control
+        gestureEnabled: true, // Enable swipe back gesture
+        headerStyle: {
+          backgroundColor: '#FFFFFF',
+        },
+        headerTintColor: '#333333',
+        headerTitleStyle: {
+          fontWeight: 'bold',
+          fontSize: 18,
+        },
       }}
     >
       {/* Authentication Screens */}
@@ -60,17 +70,42 @@ const AuthNavigator = () => {
       <Stack.Screen
         name="Home"
         component={HomeScreen}
-        options={{ gestureEnabled: false }} // Prevent back navigation from home
+        options={{
+          gestureEnabled: false, // Prevent back navigation from home
+          headerShown: false, // Home has custom header
+        }}
+      />
+      <Stack.Screen
+        name="Events"
+        component={EventsScreen}
+        options={{
+          gestureEnabled: true,
+          headerShown: false, // Use custom header in component
+        }}
+      />
+      <Stack.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{
+          gestureEnabled: true,
+          headerShown: false, // Profile has custom header with back button
+        }}
       />
       <Stack.Screen
         name="EditBooking"
         component={EditBookingScreen}
-        options={{ gestureEnabled: true }}
+        options={{
+          gestureEnabled: true,
+          headerShown: false, // Use custom header in component
+        }}
       />
       <Stack.Screen
         name="DateTimePicker"
         component={DateTimePickerScreen}
-        options={{ gestureEnabled: true }}
+        options={{
+          gestureEnabled: true,
+          headerShown: false, // Use custom header in component
+        }}
       />
     </Stack.Navigator>
   );

@@ -10,17 +10,33 @@ import {
   Alert,
   BackHandler,
   ActivityIndicator,
+  RefreshControl,
+  StatusBar,
+  Platform,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { colors } from '../utils/colors';
 import { useAuth } from '../context/AuthContext';
+import { getEventStatistics, getVenueDetails } from '../utils/authUtils';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
+
+// Device size detection for adaptive UI
+const isTablet = width >= 768;
+const isSmallDevice = width < 375;
+const isLargeDevice = width > 414;
+const isAndroid = Platform.OS === 'android';
+const statusBarHeight =
+  StatusBar.currentHeight || (Platform.OS === 'ios' ? 44 : 24);
 
 const HomeScreen = ({ navigation }) => {
   const [selectedTab, setSelectedTab] = useState(0);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const { user, logout, isAuthenticated } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [dashboardStats, setDashboardStats] = useState(null);
+  const [venueDetails, setVenueDetails] = useState(null);
+  const { user, logout, isAuthenticated, token } = useAuth();
 
   // Auth protection - redirect to login if not authenticated
   useEffect(() => {
@@ -57,6 +73,51 @@ const HomeScreen = ({ navigation }) => {
     return () => backHandler.remove();
   }, []);
 
+  // Load dashboard data
+  const loadDashboardData = async () => {
+    if (!token) return;
+
+    try {
+      setIsLoading(true);
+
+      // Load statistics and venue details in parallel
+      const [statsResult, venueResult] = await Promise.all([
+        getEventStatistics(token),
+        getVenueDetails(token),
+      ]);
+
+      if (statsResult.success) {
+        setDashboardStats(statsResult.data);
+      } else {
+        console.warn('Failed to load statistics:', statsResult.error);
+      }
+
+      if (venueResult.success) {
+        setVenueDetails(venueResult.data);
+      } else {
+        console.warn('Failed to load venue details:', venueResult.error);
+      }
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Load data on component mount
+  useEffect(() => {
+    if (isAuthenticated && token) {
+      loadDashboardData();
+    }
+  }, [isAuthenticated, token]);
+
+  // Refresh data
+  const onRefresh = async () => {
+    setIsRefreshing(true);
+    await loadDashboardData();
+    setIsRefreshing(false);
+  };
+
   const handleLogout = () => {
     if (isLoggingOut) return; // Prevent multiple logout attempts
 
@@ -92,188 +153,324 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const tabs = [
-    { icon: 'home', label: 'Home' },
-    { icon: 'calendar', label: 'Calendar' },
-    { icon: 'notifications', label: 'Notifications' },
-    { icon: 'settings', label: 'Settings' },
+    {
+      icon: 'home-outline',
+      activeIcon: 'home',
+      label: 'Dashboard',
+      route: 'Home',
+    },
+    {
+      icon: 'calendar-outline',
+      activeIcon: 'calendar',
+      label: 'Events',
+      route: 'Events',
+    },
+    {
+      icon: 'person-outline',
+      activeIcon: 'person',
+      label: 'Profile',
+      route: 'Profile',
+    },
+    {
+      icon: 'business-outline',
+      activeIcon: 'business',
+      label: 'Venue',
+      route: 'Venue',
+    },
+    {
+      icon: 'settings-outline',
+      activeIcon: 'settings',
+      label: 'Settings',
+      route: 'Settings',
+    },
   ];
 
-  const bookings = [
-    {
-      id: 1,
-      venue: 'The Grand Hall',
-      date: '23 June 2025',
-      status: 'ACTIVE',
-      amount: '₹50,000',
-    },
-    {
-      id: 2,
-      venue: 'Urban Luxe Lounge',
-      date: '22 June 2025',
-      status: 'PENDING',
-      amount: '₹35,000',
-    },
-  ];
+  // Dashboard stats configuration
+  const getStatsConfig = () => {
+    if (!dashboardStats) {
+      return [
+        {
+          title: 'Total Events',
+          number: '--',
+          icon: 'calendar-outline',
+          color: colors.primary,
+        },
+        {
+          title: 'This Month',
+          number: '--',
+          icon: 'trending-up-outline',
+          color: colors.success,
+        },
+        {
+          title: 'Revenue',
+          number: '--',
+          icon: 'cash-outline',
+          color: colors.warning,
+        },
+        {
+          title: 'Bookings',
+          number: '--',
+          icon: 'bookmark-outline',
+          color: colors.info,
+        },
+      ];
+    }
+
+    return [
+      {
+        title: 'Total Events',
+        number: dashboardStats.total_events || 0,
+        icon: 'calendar-outline',
+        color: colors.primary,
+        subtitle: 'All time events',
+      },
+      {
+        title: 'This Month',
+        number: dashboardStats.events_this_month || 0,
+        icon: 'trending-up-outline',
+        color: colors.success,
+        subtitle: 'Events this month',
+      },
+      {
+        title: 'Revenue',
+        number: `₹${(dashboardStats.total_revenue || 0).toLocaleString()}`,
+        icon: 'cash-outline',
+        color: colors.warning,
+        subtitle: 'Total earned',
+      },
+      {
+        title: 'Pending',
+        number: dashboardStats.pending_payments || 0,
+        icon: 'time-outline',
+        color: colors.error,
+        subtitle: 'Pending payments',
+      },
+    ];
+  };
+
+  // Render loading state
+  if (isLoading && !dashboardStats) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading dashboard...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.screen}>
-        <View style={styles.homeHeader}>
-          <View style={styles.welcomeSection}>
-            <Text style={styles.welcomeBackText}>
-              Welcome back, {user?.venue_name || 'User'}!
-            </Text>
-            <Text style={styles.welcomeSubText}>
-              Here's an overview of your relevant current booking status and
-              performance.
-            </Text>
-          </View>
-          <TouchableOpacity
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+
+      {/* Adaptive Top Navigation Header */}
+      <View style={[styles.header, isTablet && styles.headerTablet]}>
+        <View style={styles.headerLeft}>
+          <Text
+            style={[styles.welcomeText, isTablet && styles.welcomeTextTablet]}
+          >
+            Welcome back!
+          </Text>
+          <Text
             style={[
-              styles.profileButton,
-              isLoggingOut && styles.disabledButton,
+              styles.venueNameText,
+              isTablet && styles.venueNameTextTablet,
             ]}
+          >
+            {venueDetails?.venue_name || user?.venue_name || 'Your Venue'}
+          </Text>
+        </View>
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={[styles.headerButton, isTablet && styles.headerButtonTablet]}
+            onPress={() => navigation.navigate('Profile')}
+          >
+            <Ionicons
+              name="person-circle-outline"
+              size={isTablet ? 32 : 28}
+              color={colors.primary}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.headerButton, isTablet && styles.headerButtonTablet]}
             onPress={handleLogout}
             disabled={isLoggingOut}
           >
-            <View style={styles.profileInitial}>
-              {isLoggingOut ? (
-                <ActivityIndicator color={colors.background} size="small" />
-              ) : (
-                <Text style={styles.profileInitialText}>
-                  {user?.venue_name
-                    ? user.venue_name.charAt(0).toUpperCase()
-                    : 'U'}
-                </Text>
-              )}
-            </View>
+            {isLoggingOut ? (
+              <ActivityIndicator size="small" color={colors.error} />
+            ) : (
+              <Ionicons
+                name="log-out-outline"
+                size={isTablet ? 32 : 28}
+                color={colors.error}
+              />
+            )}
           </TouchableOpacity>
         </View>
+      </View>
 
+      <View style={styles.screen}>
         <ScrollView
           style={styles.homeContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={onRefresh}
+              colors={[colors.primary]}
+              tintColor={colors.primary}
+            />
+          }
         >
+          {/* Venue Info Card */}
+          {venueDetails && (
+            <View style={styles.venueCard}>
+              <View style={styles.venueHeader}>
+                <Ionicons name="business" size={24} color={colors.primary} />
+                <Text style={styles.venueTitle}>Venue Information</Text>
+              </View>
+              <View style={styles.venueInfo}>
+                <Text style={styles.venueInfoText}>
+                  <Text style={styles.venueInfoLabel}>Rate: </Text>₹
+                  {venueDetails.rate?.toLocaleString()} {venueDetails.rate_type}
+                </Text>
+                <Text style={styles.venueInfoText}>
+                  <Text style={styles.venueInfoLabel}>Capacity: </Text>
+                  {venueDetails.seating_capacity} guests
+                </Text>
+                <Text style={styles.venueInfoText}>
+                  <Text style={styles.venueInfoLabel}>Location: </Text>
+                  {venueDetails.city}, {venueDetails.state}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Statistics Cards */}
           <View style={styles.statsContainer}>
-            <View style={styles.statCard}>
-              <Text style={styles.statTitle}>Bookings This Month</Text>
-              <Text style={styles.statNumber}>84</Text>
-              <View style={styles.statChange}>
-                <Ionicons name="trending-up" size={16} color={colors.success} />
-                <Text style={styles.statChangeText}>
-                  12% increase from last month
-                </Text>
+            {getStatsConfig().map((stat, index) => (
+              <View key={index} style={styles.statCard}>
+                <View style={styles.statHeader}>
+                  <Ionicons name={stat.icon} size={24} color={stat.color} />
+                  <Text style={styles.statTitle}>{stat.title}</Text>
+                </View>
+                <Text style={styles.statNumber}>{stat.number}</Text>
+                {stat.subtitle && (
+                  <Text style={styles.statSubtitle}>{stat.subtitle}</Text>
+                )}
               </View>
-            </View>
-
-            <View style={styles.statCard}>
-              <Text style={styles.statTitle}>Fully Paid</Text>
-              <Text style={styles.statNumber}>50</Text>
-              <View style={styles.statChange}>
-                <Text style={styles.statChangeText}>
-                  59% bookings are fully paid
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.statCard}>
-              <Text style={styles.statTitle}>Pending Due</Text>
-              <Text style={styles.statNumber}>10</Text>
-              <View style={styles.statChange}>
-                <Text style={styles.statChangeText}>due for the payment</Text>
-              </View>
-            </View>
-
-            <View style={styles.statCard}>
-              <Text style={styles.statTitle}>Available Event Hall</Text>
-              <Text style={styles.statNumber}>12</Text>
-              <View style={styles.statChange}>
-                <Text style={styles.statChangeText}>
-                  open slots for the month
-                </Text>
-              </View>
-            </View>
+            ))}
           </View>
 
-          <View style={styles.bookingsSection}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Your Bookings</Text>
-              <View style={styles.viewOptions}>
-                <TouchableOpacity style={styles.viewButton}>
-                  <Ionicons name="grid-outline" size={20} color={colors.gray} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.viewButton}>
-                  <Ionicons name="list-outline" size={20} color={colors.gray} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.viewButton}>
-                  <Ionicons
-                    name="options-outline"
-                    size={20}
-                    color={colors.gray}
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {bookings.map(booking => (
+          {/* Quick Actions */}
+          <View style={styles.quickActionsSection}>
+            <Text style={styles.sectionTitle}>Quick Actions</Text>
+            <View style={styles.quickActionsGrid}>
               <TouchableOpacity
-                key={booking.id}
-                style={styles.bookingCard}
+                style={styles.quickActionCard}
                 onPress={() => navigation.navigate('EditBooking')}
               >
-                <View style={styles.bookingInfo}>
-                  <Text style={styles.bookingVenue}>{booking.venue}</Text>
-                  <Text style={styles.bookingDate}>{booking.date}</Text>
-                  <View style={styles.bookingFooter}>
-                    <View
-                      style={[
-                        styles.statusBadge,
-                        booking.status === 'ACTIVE'
-                          ? styles.activeBadge
-                          : styles.pendingBadge,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.statusText,
-                          booking.status === 'ACTIVE'
-                            ? styles.activeText
-                            : styles.pendingText,
-                        ]}
-                      >
-                        {booking.status}
-                      </Text>
-                    </View>
-                    <Text style={styles.bookingAmount}>{booking.amount}</Text>
-                  </View>
-                </View>
-                <TouchableOpacity style={styles.editButton}>
-                  <Ionicons
-                    name="create-outline"
-                    size={20}
-                    color={colors.primary}
-                  />
-                </TouchableOpacity>
+                <Ionicons name="add-circle" size={32} color={colors.primary} />
+                <Text style={styles.quickActionText}>Add Event</Text>
               </TouchableOpacity>
-            ))}
+
+              <TouchableOpacity
+                style={styles.quickActionCard}
+                onPress={() => setSelectedTab(2)}
+              >
+                <Ionicons name="settings" size={32} color={colors.success} />
+                <Text style={styles.quickActionText}>Venue Settings</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.quickActionCard}
+                onPress={() => setSelectedTab(1)}
+              >
+                <Ionicons name="calendar" size={32} color={colors.warning} />
+                <Text style={styles.quickActionText}>View Events</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.quickActionCard}
+                onPress={() => onRefresh()}
+              >
+                <Ionicons name="refresh" size={32} color={colors.info} />
+                <Text style={styles.quickActionText}>Refresh Data</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </ScrollView>
 
-        <View style={styles.tabBar}>
+        {/* Device-Adaptive Bottom Navigation */}
+        <View
+          style={[
+            styles.tabBar,
+            isTablet && styles.tabBarTablet,
+            isSmallDevice && styles.tabBarSmall,
+          ]}
+        >
           {tabs.map((tab, index) => (
             <TouchableOpacity
               key={index}
               style={[
                 styles.tabItem,
+                isTablet && styles.tabItemTablet,
+                isSmallDevice && styles.tabItemSmall,
                 selectedTab === index && styles.activeTab,
               ]}
-              onPress={() => setSelectedTab(index)}
+              onPress={() => {
+                setSelectedTab(index);
+
+                // Navigation logic with haptic feedback
+                if (Platform.OS === 'ios') {
+                  // Add haptic feedback for iOS
+                  // Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }
+
+                switch (index) {
+                  case 0:
+                    // Dashboard - stay on current screen
+                    break;
+                  case 1:
+                    navigation.navigate('Events');
+                    break;
+                  case 2:
+                    navigation.navigate('Profile');
+                    break;
+                  case 3:
+                    Alert.alert(
+                      'Coming Soon',
+                      'Venue management feature will be available soon.',
+                    );
+                    break;
+                  case 4:
+                    Alert.alert(
+                      'Coming Soon',
+                      'Settings feature will be available soon.',
+                    );
+                    break;
+                  default:
+                    break;
+                }
+              }}
             >
               <Ionicons
-                name={tab.icon}
-                size={24}
+                name={selectedTab === index ? tab.activeIcon : tab.icon}
+                size={isTablet ? 28 : isSmallDevice ? 20 : 24}
                 color={selectedTab === index ? colors.primary : colors.gray}
               />
+              {(!isSmallDevice || isTablet) && (
+                <Text
+                  style={[
+                    styles.tabLabel,
+                    isTablet && styles.tabLabelTablet,
+                    selectedTab === index && styles.activeTabLabel,
+                  ]}
+                >
+                  {tab.label}
+                </Text>
+              )}
             </TouchableOpacity>
           ))}
         </View>
@@ -286,6 +483,80 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+
+  // Adaptive Header Styles
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: isSmallDevice ? 16 : 20,
+    paddingVertical: isSmallDevice ? 12 : 16,
+    backgroundColor: colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  headerTablet: {
+    paddingHorizontal: 32,
+    paddingVertical: 20,
+  },
+  headerLeft: {
+    flex: 1,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  welcomeText: {
+    fontSize: isSmallDevice ? 14 : 16,
+    color: colors.gray,
+    fontWeight: '500',
+  },
+  welcomeTextTablet: {
+    fontSize: 18,
+  },
+  venueNameText: {
+    fontSize: isSmallDevice ? 18 : 20,
+    fontWeight: 'bold',
+    color: colors.secondary,
+    marginTop: 2,
+  },
+  venueNameTextTablet: {
+    fontSize: 24,
+  },
+  headerButton: {
+    padding: isSmallDevice ? 8 : 10,
+    marginLeft: 12,
+    borderRadius: 20,
+    backgroundColor: colors.lightGray,
+  },
+  headerButtonTablet: {
+    padding: 12,
+    marginLeft: 16,
+  },
+
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: colors.gray,
+    textAlign: 'center',
   },
   screen: {
     flex: 1,
@@ -336,6 +607,46 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
   },
+
+  // Venue Card Styles
+  venueCard: {
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  venueHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  venueTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.secondary,
+    marginLeft: 8,
+  },
+  venueInfo: {
+    gap: 8,
+  },
+  venueInfoText: {
+    fontSize: 14,
+    color: colors.secondary,
+    lineHeight: 20,
+  },
+  venueInfoLabel: {
+    fontWeight: '600',
+    color: colors.secondary,
+  },
+
+  // Stats Container
   statsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -356,55 +667,43 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  statHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   statTitle: {
     fontSize: 12,
     color: colors.gray,
-    marginBottom: 8,
+    marginLeft: 8,
     fontWeight: '500',
   },
   statNumber: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: colors.secondary,
-    marginBottom: 8,
+    marginBottom: 4,
   },
-  statChange: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statChangeText: {
-    fontSize: 11,
+  statSubtitle: {
+    fontSize: 10,
     color: colors.gray,
-    marginLeft: 4,
   },
-  bookingsSection: {
-    flex: 1,
+
+  // Quick Actions
+  quickActionsSection: {
+    marginBottom: 20,
   },
-  sectionHeader: {
+  quickActionsGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.secondary,
-  },
-  viewOptions: {
-    flexDirection: 'row',
-  },
-  viewButton: {
-    padding: 8,
-    marginLeft: 8,
-  },
-  bookingCard: {
+  quickActionCard: {
+    width: (width - 60) / 2,
     backgroundColor: colors.background,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 2 },
@@ -414,70 +713,94 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  bookingInfo: {
-    flex: 1,
-  },
-  bookingVenue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.secondary,
-    marginBottom: 4,
-  },
-  bookingDate: {
-    fontSize: 14,
-    color: colors.gray,
-    marginBottom: 12,
-  },
-  bookingFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  activeBadge: {
-    backgroundColor: '#E6F7FF',
-  },
-  pendingBadge: {
-    backgroundColor: '#FFF7E6',
-  },
-  statusText: {
+  quickActionText: {
     fontSize: 12,
-    fontWeight: '600',
-  },
-  activeText: {
-    color: '#1890FF',
-  },
-  pendingText: {
-    color: '#FA8C16',
-  },
-  bookingAmount: {
-    fontSize: 16,
-    fontWeight: '600',
     color: colors.secondary,
+    marginTop: 8,
+    textAlign: 'center',
+    fontWeight: '500',
   },
-  editButton: {
-    padding: 8,
-    marginLeft: 12,
+
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.secondary,
+    marginBottom: 16,
   },
+
+  // Device-Adaptive Tab Bar Styles
   tabBar: {
     flexDirection: 'row',
     backgroundColor: colors.background,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingVertical: isSmallDevice ? 8 : 12,
+    paddingHorizontal: isSmallDevice ? 8 : 20,
+    paddingBottom: Platform.select({
+      ios: isSmallDevice ? 20 : 28, // Account for home indicator
+      android: isSmallDevice ? 8 : 12,
+    }),
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: -1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
+  tabBarTablet: {
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    paddingBottom: 24,
+  },
+  tabBarSmall: {
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    paddingBottom: Platform.select({
+      ios: 18,
+      android: 6,
+    }),
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 8,
+    justifyContent: 'center',
+    paddingVertical: isSmallDevice ? 6 : 8,
+    paddingHorizontal: 4,
+    borderRadius: 12,
+    minHeight: isSmallDevice ? 36 : 44, // Ensure touch target meets accessibility guidelines
+  },
+  tabItemTablet: {
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    minHeight: 56,
+  },
+  tabItemSmall: {
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+    minHeight: 32,
   },
   activeTab: {
-    // Active tab styling handled by icon color
+    backgroundColor: colors.lightGray,
+  },
+  tabLabel: {
+    fontSize: isSmallDevice ? 10 : 12,
+    color: colors.gray,
+    marginTop: 2,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  tabLabelTablet: {
+    fontSize: 14,
+    marginTop: 4,
+  },
+  activeTabLabel: {
+    color: colors.primary,
+    fontWeight: '600',
   },
 });
 

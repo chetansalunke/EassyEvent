@@ -1,0 +1,497 @@
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  StyleSheet,
+  Dimensions,
+  SafeAreaView,
+  Alert,
+  ActivityIndicator,
+  RefreshControl,
+  StatusBar,
+  Platform,
+} from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import { colors } from '../utils/colors';
+import { useAuth } from '../context/AuthContext';
+import { getVenueDetails, updateVenueDetails } from '../utils/authUtils';
+
+const { width, height } = Dimensions.get('window');
+const isIOS = Platform.OS === 'ios';
+const statusBarHeight = StatusBar.currentHeight || (isIOS ? 44 : 24);
+
+const ProfileScreen = ({ navigation }) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [venueDetails, setVenueDetails] = useState(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const { user, logout, token } = useAuth();
+
+  // Load venue details
+  const loadVenueDetails = async () => {
+    if (!token) return;
+
+    try {
+      setIsLoading(true);
+      const result = await getVenueDetails(token);
+
+      if (result.success) {
+        setVenueDetails(result.data);
+      } else {
+        console.warn('Failed to load venue details:', result.error);
+      }
+    } catch (error) {
+      console.error('Error loading venue details:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadVenueDetails();
+  }, [token]);
+
+  const onRefresh = async () => {
+    setIsRefreshing(true);
+    await loadVenueDetails();
+    setIsRefreshing(false);
+  };
+
+  const handleLogout = () => {
+    if (isLoggingOut) return;
+
+    Alert.alert('Logout', 'Are you sure you want to logout?', [
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+      {
+        text: 'Logout',
+        onPress: async () => {
+          setIsLoggingOut(true);
+          try {
+            const success = await logout();
+            if (success) {
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Login' }],
+              });
+            } else {
+              Alert.alert('Error', 'Failed to logout. Please try again.');
+            }
+          } catch (error) {
+            console.error('Logout error:', error);
+            Alert.alert('Error', 'Failed to logout. Please try again.');
+          } finally {
+            setIsLoggingOut(false);
+          }
+        },
+      },
+    ]);
+  };
+
+  const InfoCard = ({ title, children, icon }) => (
+    <View style={styles.infoCard}>
+      <View style={styles.cardHeader}>
+        <Ionicons name={icon} size={24} color={colors.primary} />
+        <Text style={styles.cardTitle}>{title}</Text>
+      </View>
+      {children}
+    </View>
+  );
+
+  const InfoRow = ({ label, value, icon }) => (
+    <View style={styles.infoRow}>
+      <View style={styles.infoLeft}>
+        <Ionicons name={icon} size={16} color={colors.gray} />
+        <Text style={styles.infoLabel}>{label}</Text>
+      </View>
+      <Text style={styles.infoValue}>{value || 'Not specified'}</Text>
+    </View>
+  );
+
+  if (isLoading && !venueDetails) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar
+          barStyle="dark-content"
+          backgroundColor={colors.background}
+        />
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.secondary} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Profile</Text>
+          <View style={styles.headerRight} />
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading profile...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.secondary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Profile</Text>
+        <TouchableOpacity
+          style={[styles.logoutButton, isLoggingOut && styles.disabledButton]}
+          onPress={handleLogout}
+          disabled={isLoggingOut}
+        >
+          {isLoggingOut ? (
+            <ActivityIndicator size="small" color={colors.error} />
+          ) : (
+            <Ionicons name="log-out-outline" size={24} color={colors.error} />
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
+        }
+      >
+        {/* Profile Header */}
+        <View style={styles.profileHeader}>
+          <View style={styles.avatarContainer}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {(venueDetails?.venue_name || user?.venue_name || 'U')
+                  .charAt(0)
+                  .toUpperCase()}
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.venueName}>
+            {venueDetails?.venue_name || user?.venue_name || 'Venue Name'}
+          </Text>
+          <Text style={styles.venueEmail}>
+            {venueDetails?.email || user?.email || 'email@example.com'}
+          </Text>
+        </View>
+
+        {/* Venue Information */}
+        <InfoCard title="Venue Information" icon="business">
+          <InfoRow
+            label="Venue Name"
+            value={venueDetails?.venue_name}
+            icon="home-outline"
+          />
+          <InfoRow
+            label="Phone"
+            value={venueDetails?.phone}
+            icon="call-outline"
+          />
+          <InfoRow
+            label="Email"
+            value={venueDetails?.email}
+            icon="mail-outline"
+          />
+        </InfoCard>
+
+        {/* Address Information */}
+        <InfoCard title="Address" icon="location">
+          <InfoRow
+            label="Address Line 1"
+            value={venueDetails?.address_line1}
+            icon="location-outline"
+          />
+          {venueDetails?.address_line2 && (
+            <InfoRow
+              label="Address Line 2"
+              value={venueDetails?.address_line2}
+              icon="location-outline"
+            />
+          )}
+          <InfoRow
+            label="City"
+            value={venueDetails?.city}
+            icon="business-outline"
+          />
+          <InfoRow
+            label="State"
+            value={venueDetails?.state}
+            icon="map-outline"
+          />
+          <InfoRow
+            label="PIN Code"
+            value={venueDetails?.pin?.toString()}
+            icon="pin-outline"
+          />
+        </InfoCard>
+
+        {/* Venue Details */}
+        <InfoCard title="Venue Details" icon="information-circle">
+          <InfoRow
+            label="Seating Capacity"
+            value={venueDetails?.seating_capacity?.toString() + ' guests'}
+            icon="people-outline"
+          />
+          <InfoRow
+            label="Rate"
+            value={
+              venueDetails?.rate
+                ? `₹${venueDetails.rate?.toLocaleString()}`
+                : undefined
+            }
+            icon="cash-outline"
+          />
+          <InfoRow
+            label="Rate Type"
+            value={venueDetails?.rate_type}
+            icon="time-outline"
+          />
+        </InfoCard>
+
+        {/* Action Buttons */}
+        <View style={styles.actionSection}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => {
+              // Future: Navigate to edit profile
+              Alert.alert(
+                'Coming Soon',
+                'Edit profile feature will be available soon.',
+              );
+            }}
+          >
+            <Ionicons name="create-outline" size={20} color={colors.primary} />
+            <Text style={styles.actionButtonText}>Edit Profile</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => {
+              // Future: Navigate to settings
+              Alert.alert(
+                'Coming Soon',
+                'Settings feature will be available soon.',
+              );
+            }}
+          >
+            <Ionicons name="settings-outline" size={20} color={colors.info} />
+            <Text style={styles.actionButtonText}>Settings</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* App Info */}
+        <View style={styles.appInfo}>
+          <Text style={styles.appInfoText}>EasyEvent v1.0.0</Text>
+          <Text style={styles.appInfoText}>Venue Management System</Text>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: colors.gray,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.background,
+    ...Platform.select({
+      ios: {
+        paddingTop: 16,
+      },
+      android: {
+        paddingTop: 16,
+        elevation: 2,
+      },
+    }),
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.secondary,
+  },
+  backButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: colors.lightGray,
+  },
+  headerRight: {
+    width: 40,
+  },
+  logoutButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: colors.lightGray,
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  profileHeader: {
+    alignItems: 'center',
+    paddingVertical: 30,
+  },
+  avatarContainer: {
+    marginBottom: 16,
+  },
+  avatar: {
+    width: 80,
+    height: 80,
+    backgroundColor: colors.primary,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  avatarText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: colors.background,
+  },
+  venueName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.secondary,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  venueEmail: {
+    fontSize: 16,
+    color: colors.gray,
+    textAlign: 'center',
+  },
+  infoCard: {
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.secondary,
+    marginLeft: 8,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.lightGray,
+  },
+  infoLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  infoLabel: {
+    fontSize: 14,
+    color: colors.gray,
+    marginLeft: 8,
+    fontWeight: '500',
+  },
+  infoValue: {
+    fontSize: 14,
+    color: colors.secondary,
+    fontWeight: '600',
+    textAlign: 'right',
+    flex: 1,
+  },
+  actionSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: 20,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.background,
+    padding: 16,
+    borderRadius: 12,
+    marginHorizontal: 6,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  actionButtonText: {
+    fontSize: 14,
+    color: colors.secondary,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  appInfo: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    marginBottom: 20,
+  },
+  appInfoText: {
+    fontSize: 12,
+    color: colors.gray,
+    textAlign: 'center',
+  },
+});
+
+export default ProfileScreen;
