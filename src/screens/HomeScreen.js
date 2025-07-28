@@ -7,14 +7,36 @@ import {
   StyleSheet,
   Dimensions,
   SafeAreaView,
+  Alert,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { colors } from '../utils/colors';
+import { useAuth } from '../context/AuthContext';
 
 const { width } = Dimensions.get('window');
 
 const HomeScreen = ({ navigation }) => {
   const [selectedTab, setSelectedTab] = useState(0);
+  const { user, logout } = useAuth();
+
+  const handleLogout = () => {
+    Alert.alert('Logout', 'Are you sure you want to logout?', [
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+      {
+        text: 'Logout',
+        onPress: async () => {
+          const success = await logout();
+          if (success) {
+            // Navigation will be handled by the auth state change
+            console.log('Logged out successfully');
+          }
+        },
+      },
+    ]);
+  };
 
   const tabs = [
     { icon: 'home', label: 'Home' },
@@ -45,15 +67,21 @@ const HomeScreen = ({ navigation }) => {
       <View style={styles.screen}>
         <View style={styles.homeHeader}>
           <View style={styles.welcomeSection}>
-            <Text style={styles.welcomeBackText}>Welcome back, Joe!</Text>
+            <Text style={styles.welcomeBackText}>
+              Welcome back, {user?.venue_name || 'User'}!
+            </Text>
             <Text style={styles.welcomeSubText}>
               Here's an overview of your relevant current booking status and
               performance.
             </Text>
           </View>
-          <TouchableOpacity style={styles.profileButton}>
+          <TouchableOpacity style={styles.profileButton} onPress={handleLogout}>
             <View style={styles.profileInitial}>
-              <Text style={styles.profileInitialText}>J</Text>
+              <Text style={styles.profileInitialText}>
+                {user?.venue_name
+                  ? user.venue_name.charAt(0).toUpperCase()
+                  : 'U'}
+              </Text>
             </View>
           </TouchableOpacity>
         </View>

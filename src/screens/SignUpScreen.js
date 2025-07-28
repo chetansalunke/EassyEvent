@@ -21,6 +21,9 @@ import {
   validationRules,
   formatValidation,
 } from '../utils/validation';
+import { apiRequest } from '../config/apiConfig';
+import API_CONFIG from '../config/apiConfig';
+import { handleApiError } from '../utils/networkUtils';
 
 // Simple static data for states and cities
 const SIMPLE_STATES = [
@@ -39,6 +42,8 @@ const SIMPLE_CITIES = [
   'New Delhi',
 ];
 
+const RATE_TYPES = ['per day', 'per hour'];
+
 const SignUpScreen = ({ navigation }) => {
   const [formData, setFormData] = useState({
     email: '',
@@ -49,6 +54,8 @@ const SignUpScreen = ({ navigation }) => {
     state: '',
     pinCode: ['', '', '', '', '', ''],
     seatingCapacity: '',
+    rate: '',
+    rateType: '',
     password: '',
     confirmPassword: '',
   });
@@ -58,6 +65,7 @@ const SignUpScreen = ({ navigation }) => {
   const [errors, setErrors] = useState({});
   const [showCityModal, setShowCityModal] = useState(false);
   const [showStateModal, setShowStateModal] = useState(false);
+  const [showRateTypeModal, setShowRateTypeModal] = useState(false);
 
   // Refs for PIN code inputs
   const pinRefs = useRef([]);
@@ -74,6 +82,11 @@ const SignUpScreen = ({ navigation }) => {
       city: { required: true, message: 'City is required' },
       state: { required: true, message: 'State is required' },
       seatingCapacity: validationRules.seatingCapacity,
+      rate: {
+        required: true,
+        message: 'Rate is required',
+      },
+      rateType: { required: true, message: 'Rate type is required' },
       password: validationRules.password,
     };
 
@@ -99,6 +112,12 @@ const SignUpScreen = ({ navigation }) => {
         'Seating capacity must be between 1 and 10,000';
     }
 
+    // Custom validation for rate
+    const rate = parseFloat(formData.rate);
+    if (!rate || rate < 1 || rate > 1000000) {
+      formErrors.rate = 'Rate must be between ₹1 and ₹10,00,000';
+    }
+
     setErrors(formErrors);
     return Object.keys(formErrors).length === 0;
   };
@@ -115,37 +134,33 @@ const SignUpScreen = ({ navigation }) => {
       // Prepare data for API (matching your backend expected format)
       const userData = {
         email: formData.email.toLowerCase().trim(),
-        businessName: formData.name.trim(),
-        address: {
-          line1: formData.addressLine1.trim(),
-          line2: formData.addressLine2.trim(),
-          city: formData.city,
-          state: formData.state,
-          pinCode: formData.pinCode.join(''),
-        },
-        seatingCapacity: parseInt(formData.seatingCapacity),
+        venue_name: formData.name.trim(),
+        address_line1: formData.addressLine1.trim(),
+        address_line2: formData.addressLine2.trim(),
+        city: formData.city,
+        state: formData.state,
+        pin: formData.pinCode.join(''),
+        seating_capacity: formData.seatingCapacity,
+        rate: parseFloat(formData.rate),
+        rate_type: formData.rateType,
         password: formData.password,
       };
 
       console.log('Sending signup data:', userData);
 
-      // Direct API call to your backend
-      const response = await fetch('http://10.0.2.2:5000/api/auth/signup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      // Use the enhanced API request function
+      const { response, data: result } = await apiRequest(
+        API_CONFIG.ENDPOINTS.SIGNUP,
+        {
+          method: 'POST',
+          body: JSON.stringify(userData),
         },
-        body: JSON.stringify(userData),
-      });
+      );
 
-      const result = await response.json();
-      console.log('API response:', result);
-
-      if (response.ok && result.status === 'success') {
+      if (response.ok && result.success !== false) {
         Alert.alert(
           'Registration Successful!',
-          result.message ||
-            'Your account has been created successfully. Please check your email to verify your account.',
+          'Your account has been created successfully. Please login to continue.',
           [
             {
               text: 'OK',
@@ -155,17 +170,40 @@ const SignUpScreen = ({ navigation }) => {
         );
       } else {
         // Handle error response
-        const errorMessage =
-          result.message || 'Registration failed. Please try again.';
-        console.log('Registration error:', errorMessage);
-        Alert.alert('Registration Failed', errorMessage);
+        let errorMessage = 'Registration failed. Please try again.';
+
+        if (result.error === 'Account already exists') {
+          Alert.alert(
+            'Account Already Exists',
+            'An account with this email already exists. Would you like to login instead?',
+            [
+              {
+                text: 'Cancel',
+                style: 'cancel',
+              },
+              {
+                text: 'Login',
+                onPress: () => navigation.navigate('Login'),
+              },
+            ],
+          );
+        } else if (result.message) {
+          errorMessage = result.message;
+        } else if (result.error) {
+          errorMessage = result.error;
+        }
+
+        // Only show alert for other errors (not account exists)
+        if (result.error !== 'Account already exists') {
+          console.log('Registration error:', errorMessage);
+          Alert.alert('Registration Failed', errorMessage);
+        }
       }
     } catch (error) {
       console.error('Signup error:', error);
-      Alert.alert(
-        'Registration Failed',
-        'Network error. Please check your internet connection and try again.',
-      );
+
+      const errorMessage = handleApiError(error);
+      Alert.alert('Registration Failed', errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -225,6 +263,15 @@ const SignUpScreen = ({ navigation }) => {
     setShowStateModal(false);
     if (errors.state) {
       setErrors(prev => ({ ...prev, state: null }));
+    }
+  };
+
+  const selectRateType = rateType => {
+    console.log('Selected rate type:', rateType); // Debug log
+    setFormData(prev => ({ ...prev, rateType }));
+    setShowRateTypeModal(false);
+    if (errors.rateType) {
+      setErrors(prev => ({ ...prev, rateType: null }));
     }
   };
 
@@ -464,6 +511,50 @@ const SignUpScreen = ({ navigation }) => {
             )}
           </View>
 
+          <View style={styles.row}>
+            <View style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}>
+              <Text style={styles.inputLabel}>Rate (₹)</Text>
+              <TextInput
+                style={[styles.input, errors.rate && styles.inputError]}
+                value={formData.rate}
+                onChangeText={value => updateFormData('rate', value)}
+                placeholder="e.g., 5000"
+                keyboardType="numeric"
+              />
+              {errors.rate && (
+                <Text style={styles.errorText}>{errors.rate}</Text>
+              )}
+            </View>
+
+            <View style={[styles.inputContainer, { flex: 1, marginLeft: 10 }]}>
+              <Text style={styles.inputLabel}>Rate Type</Text>
+              <TouchableOpacity
+                style={[
+                  styles.input,
+                  styles.dropdown,
+                  errors.rateType && styles.inputError,
+                ]}
+                onPress={() => {
+                  console.log('Rate type dropdown pressed'); // Debug log
+                  setShowRateTypeModal(true);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={
+                    formData.rateType ? styles.inputText : styles.placeholder
+                  }
+                >
+                  {formData.rateType || 'Select rate type'}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color={colors.gray} />
+              </TouchableOpacity>
+              {errors.rateType && (
+                <Text style={styles.errorText}>{errors.rateType}</Text>
+              )}
+            </View>
+          </View>
+
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Password</Text>
             <View style={styles.passwordContainer}>
@@ -507,7 +598,7 @@ const SignUpScreen = ({ navigation }) => {
                 ]}
                 value={formData.confirmPassword}
                 onChangeText={value => updateFormData('confirmPassword', value)}
-                placeholder="Re-enter your password for confirmation"
+                placeholder="Re-enter your password "
                 secureTextEntry={!showConfirmPassword}
               />
               <TouchableOpacity
@@ -571,6 +662,14 @@ const SignUpScreen = ({ navigation }) => {
             selectState,
             'Select State',
           )}
+
+          {renderDropdownModal(
+            showRateTypeModal,
+            () => setShowRateTypeModal(false),
+            RATE_TYPES,
+            selectRateType,
+            'Select Rate Type',
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -607,7 +706,7 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 50,
+    marginBottom: 20,
   },
   logoImage: {
     width: 120,
@@ -628,7 +727,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.gray,
     textAlign: 'center',
-    marginBottom: 32,
+    marginBottom: 24,
     lineHeight: 22,
   },
   inputContainer: {

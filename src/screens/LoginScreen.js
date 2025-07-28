@@ -13,12 +13,17 @@ import {
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { colors } from '../utils/colors';
+import { useAuth } from '../context/AuthContext';
+import { apiRequest } from '../config/apiConfig';
+import API_CONFIG from '../config/apiConfig';
+import { handleApiError } from '../utils/networkUtils';
 
 const LoginScreen = ({ navigation }) => {
-  const [email, setEmail] = useState('johndoe@email.com');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const { login } = useAuth();
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -27,10 +32,51 @@ const LoginScreen = ({ navigation }) => {
     }
 
     setIsLoading(true);
-    setTimeout(() => {
+
+    try {
+      // API call to login using enhanced API function
+      const { response, data: result } = await apiRequest(
+        API_CONFIG.ENDPOINTS.LOGIN,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            email: email.toLowerCase().trim(),
+            password: password,
+          }),
+        },
+      );
+
+      if (response.ok && result.token) {
+        // Login successful
+        const success = await login(result.token, result.venue_data);
+
+        if (success) {
+          // Navigation will be handled by the auth state change
+          navigation.navigate('Home');
+        } else {
+          Alert.alert('Error', 'Failed to save login data. Please try again.');
+        }
+      } else {
+        // Handle error response
+        let errorMessage = 'Login failed. Please try again.';
+
+        if (result.error) {
+          errorMessage = result.error;
+        } else if (result.message) {
+          errorMessage = result.message;
+        }
+
+        console.log('Login error:', errorMessage);
+        Alert.alert('Login Failed', errorMessage);
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+
+      const errorMessage = handleApiError(error);
+      Alert.alert('Login Failed', errorMessage);
+    } finally {
       setIsLoading(false);
-      navigation.navigate('Home');
-    }, 1500);
+    }
   };
 
   return (

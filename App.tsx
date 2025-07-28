@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { StatusBar, SafeAreaView } from 'react-native';
+import { StatusBar } from 'react-native';
 
 // Import all screen components
 import SplashScreen from './src/screens/SplashScreen';
@@ -12,28 +12,58 @@ import HomeScreen from './src/screens/HomeScreen';
 import EditBookingScreen from './src/screens/EditBookingScreen';
 import DateTimePickerScreen from './src/screens/DateTimePickerScreen';
 
+// Import Auth Context and Loading Screen
+import { AuthProvider, useAuth } from './src/context/AuthContext';
+import LoadingScreen from './src/components/LoadingScreen';
+
 const Stack = createNativeStackNavigator();
+
+const AuthNavigator = () => {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <LoadingScreen message="Initializing..." />;
+  }
+
+  return (
+    <Stack.Navigator
+      initialRouteName={isAuthenticated ? 'Home' : 'Splash'}
+      screenOptions={{
+        headerShown: false,
+        animation: 'slide_from_right',
+      }}
+    >
+      {isAuthenticated ? (
+        // Authenticated screens
+        <>
+          <Stack.Screen name="Home" component={HomeScreen} />
+          <Stack.Screen name="EditBooking" component={EditBookingScreen} />
+          <Stack.Screen
+            name="DateTimePicker"
+            component={DateTimePickerScreen}
+          />
+        </>
+      ) : (
+        // Non-authenticated screens
+        <>
+          <Stack.Screen name="Splash" component={SplashScreen} />
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="SignUp" component={SignUpScreen} />
+          <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+        </>
+      )}
+    </Stack.Navigator>
+  );
+};
 
 const App = () => {
   return (
-    <NavigationContainer>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      <Stack.Navigator
-        initialRouteName="Splash"
-        screenOptions={{
-          headerShown: false,
-          animation: 'slide_from_right',
-        }}
-      >
-        <Stack.Screen name="Splash" component={SplashScreen} />
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="SignUp" component={SignUpScreen} />
-        <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
-        <Stack.Screen name="Home" component={HomeScreen} />
-        <Stack.Screen name="EditBooking" component={EditBookingScreen} />
-        <Stack.Screen name="DateTimePicker" component={DateTimePickerScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <AuthProvider>
+      <NavigationContainer>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <AuthNavigator />
+      </NavigationContainer>
+    </AuthProvider>
   );
 };
 
