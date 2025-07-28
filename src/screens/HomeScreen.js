@@ -9,6 +9,7 @@ import {
   SafeAreaView,
   Alert,
   BackHandler,
+  ActivityIndicator,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { colors } from '../utils/colors';
@@ -18,6 +19,7 @@ const { width } = Dimensions.get('window');
 
 const HomeScreen = ({ navigation }) => {
   const [selectedTab, setSelectedTab] = useState(0);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { user, logout, isAuthenticated } = useAuth();
 
   // Auth protection - redirect to login if not authenticated
@@ -56,6 +58,8 @@ const HomeScreen = ({ navigation }) => {
   }, []);
 
   const handleLogout = () => {
+    if (isLoggingOut) return; // Prevent multiple logout attempts
+
     Alert.alert('Logout', 'Are you sure you want to logout?', [
       {
         text: 'Cancel',
@@ -64,13 +68,23 @@ const HomeScreen = ({ navigation }) => {
       {
         text: 'Logout',
         onPress: async () => {
-          const success = await logout();
-          if (success) {
-            // Reset navigation stack to prevent back navigation to authenticated screens
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'Login' }],
-            });
+          setIsLoggingOut(true);
+          try {
+            const success = await logout();
+            if (success) {
+              // Reset navigation stack to prevent back navigation to authenticated screens
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Login' }],
+              });
+            } else {
+              Alert.alert('Error', 'Failed to logout. Please try again.');
+            }
+          } catch (error) {
+            console.error('Logout error:', error);
+            Alert.alert('Error', 'Failed to logout. Please try again.');
+          } finally {
+            setIsLoggingOut(false);
           }
         },
       },
@@ -114,13 +128,24 @@ const HomeScreen = ({ navigation }) => {
               performance.
             </Text>
           </View>
-          <TouchableOpacity style={styles.profileButton} onPress={handleLogout}>
+          <TouchableOpacity
+            style={[
+              styles.profileButton,
+              isLoggingOut && styles.disabledButton,
+            ]}
+            onPress={handleLogout}
+            disabled={isLoggingOut}
+          >
             <View style={styles.profileInitial}>
-              <Text style={styles.profileInitialText}>
-                {user?.venue_name
-                  ? user.venue_name.charAt(0).toUpperCase()
-                  : 'U'}
-              </Text>
+              {isLoggingOut ? (
+                <ActivityIndicator color={colors.background} size="small" />
+              ) : (
+                <Text style={styles.profileInitialText}>
+                  {user?.venue_name
+                    ? user.venue_name.charAt(0).toUpperCase()
+                    : 'U'}
+                </Text>
+              )}
             </View>
           </TouchableOpacity>
         </View>
@@ -290,6 +315,9 @@ const styles = StyleSheet.create({
   },
   profileButton: {
     marginLeft: 16,
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
   profileInitial: {
     width: 48,

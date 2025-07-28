@@ -4,6 +4,7 @@ const API_CONFIG = {
   ENDPOINTS: {
     SIGNUP: '/auth/signup/',
     LOGIN: '/auth/login/',
+    LOGOUT: '/auth/logout/',
   },
 };
 

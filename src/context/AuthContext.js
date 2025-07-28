@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { callLogoutAPI } from '../utils/authUtils';
 
 const AuthContext = createContext();
 
@@ -57,6 +58,17 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
+      // Call logout API if user has a token
+      if (token) {
+        const result = await callLogoutAPI(token);
+        if (result.success) {
+          console.log('Server logout successful');
+        } else {
+          console.warn('Server logout failed:', result.error);
+        }
+      }
+
+      // Always perform local logout regardless of API call result
       await AsyncStorage.removeItem('userToken');
       await AsyncStorage.removeItem('userData');
 
@@ -66,7 +78,7 @@ export const AuthProvider = ({ children }) => {
 
       return true;
     } catch (error) {
-      console.error('Error removing auth data:', error);
+      console.error('Error during logout:', error);
       return false;
     }
   };
