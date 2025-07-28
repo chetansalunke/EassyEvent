@@ -15,15 +15,8 @@ import {
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { colors } from '../utils/colors';
-import { authAPI } from '../services/api';
-import {
-  validateForm,
-  validationRules,
-  formatValidation,
-} from '../utils/validation';
-import { apiRequest } from '../config/apiConfig';
+import { validateForm, validationRules } from '../utils/validation';
 import API_CONFIG from '../config/apiConfig';
-import { handleApiError } from '../utils/networkUtils';
 
 // Simple static data for states and cities
 const SIMPLE_STATES = [
@@ -43,6 +36,36 @@ const SIMPLE_CITIES = [
 ];
 
 const RATE_TYPES = ['per day', 'per hour'];
+
+// Simple API call function
+const signupUser = async userData => {
+  try {
+    const response = await fetch(
+      `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SIGNUP}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(userData),
+      },
+    );
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || result.error || 'Registration failed');
+    }
+
+    return result;
+  } catch (error) {
+    if (error.message.includes('Network request failed')) {
+      throw new Error('Network error. Please check your internet connection.');
+    }
+    throw error;
+  }
+};
 
 const SignUpScreen = ({ navigation }) => {
   const [formData, setFormData] = useState({
@@ -124,14 +147,13 @@ const SignUpScreen = ({ navigation }) => {
 
   const handleSignUp = async () => {
     if (!validateFormData()) {
-      console.log('Form validation failed', errors);
       return;
     }
 
     setIsLoading(true);
 
     try {
-      // Prepare data for API (matching your backend expected format)
+      // Prepare user data for API
       const userData = {
         email: formData.email.toLowerCase().trim(),
         venue_name: formData.name.trim(),
@@ -140,70 +162,54 @@ const SignUpScreen = ({ navigation }) => {
         city: formData.city,
         state: formData.state,
         pin: formData.pinCode.join(''),
-        seating_capacity: formData.seatingCapacity,
+        seating_capacity: parseInt(formData.seatingCapacity),
         rate: parseFloat(formData.rate),
         rate_type: formData.rateType,
         password: formData.password,
       };
 
-      console.log('Sending signup data:', userData);
+      // Call signup API
+      await signupUser(userData);
 
-      // Use the enhanced API request function
-      const { response, data: result } = await apiRequest(
-        API_CONFIG.ENDPOINTS.SIGNUP,
-        {
-          method: 'POST',
-          body: JSON.stringify(userData),
-        },
+      // Show success message
+      Alert.alert(
+        'Registration Successful!',
+        'Your account has been created successfully. Please login to continue.',
+        [
+          {
+            text: 'OK',
+            onPress: () =>
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Login' }],
+              }),
+          },
+        ],
       );
-
-      if (response.ok && result.success !== false) {
+    } catch (error) {
+      // Handle specific errors
+      if (
+        error.message.includes('Account already exists') ||
+        error.message.includes('already exists')
+      ) {
         Alert.alert(
-          'Registration Successful!',
-          'Your account has been created successfully. Please login to continue.',
+          'Account Already Exists',
+          'An account with this email already exists. Would you like to login instead?',
           [
+            { text: 'Cancel', style: 'cancel' },
             {
-              text: 'OK',
-              onPress: () => navigation.navigate('Login'),
+              text: 'Login',
+              onPress: () =>
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'Login' }],
+                }),
             },
           ],
         );
       } else {
-        // Handle error response
-        let errorMessage = 'Registration failed. Please try again.';
-
-        if (result.error === 'Account already exists') {
-          Alert.alert(
-            'Account Already Exists',
-            'An account with this email already exists. Would you like to login instead?',
-            [
-              {
-                text: 'Cancel',
-                style: 'cancel',
-              },
-              {
-                text: 'Login',
-                onPress: () => navigation.navigate('Login'),
-              },
-            ],
-          );
-        } else if (result.message) {
-          errorMessage = result.message;
-        } else if (result.error) {
-          errorMessage = result.error;
-        }
-
-        // Only show alert for other errors (not account exists)
-        if (result.error !== 'Account already exists') {
-          console.log('Registration error:', errorMessage);
-          Alert.alert('Registration Failed', errorMessage);
-        }
+        Alert.alert('Registration Failed', error.message);
       }
-    } catch (error) {
-      console.error('Signup error:', error);
-
-      const errorMessage = handleApiError(error);
-      Alert.alert('Registration Failed', errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -244,7 +250,6 @@ const SignUpScreen = ({ navigation }) => {
 
   // Handle dropdown selections
   const selectCity = city => {
-    console.log('Selected city:', city); // Debug log
     setFormData(prev => ({ ...prev, city }));
     setShowCityModal(false);
     if (errors.city) {
@@ -253,13 +258,7 @@ const SignUpScreen = ({ navigation }) => {
   };
 
   const selectState = state => {
-    console.log('Selected state:', state); // Debug log
-    setFormData(prev => ({
-      ...prev,
-      state,
-      // Don't reset city since we're using independent dropdowns
-    }));
-
+    setFormData(prev => ({ ...prev, state }));
     setShowStateModal(false);
     if (errors.state) {
       setErrors(prev => ({ ...prev, state: null }));
@@ -267,7 +266,6 @@ const SignUpScreen = ({ navigation }) => {
   };
 
   const selectRateType = rateType => {
-    console.log('Selected rate type:', rateType); // Debug log
     setFormData(prev => ({ ...prev, rateType }));
     setShowRateTypeModal(false);
     if (errors.rateType) {
@@ -302,10 +300,7 @@ const SignUpScreen = ({ navigation }) => {
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={styles.modalItem}
-                  onPress={() => {
-                    console.log('Item selected:', item); // Debug log
-                    onSelect(item);
-                  }}
+                  onPress={() => onSelect(item)}
                   activeOpacity={0.7}
                 >
                   <Text style={styles.modalItemText}>{item}</Text>
@@ -410,10 +405,7 @@ const SignUpScreen = ({ navigation }) => {
                   styles.dropdown,
                   errors.city && styles.inputError,
                 ]}
-                onPress={() => {
-                  console.log('City dropdown pressed'); // Debug log
-                  setShowCityModal(true);
-                }}
+                onPress={() => setShowCityModal(true)}
                 activeOpacity={0.7}
               >
                 <Text
@@ -436,10 +428,7 @@ const SignUpScreen = ({ navigation }) => {
                   styles.dropdown,
                   errors.state && styles.inputError,
                 ]}
-                onPress={() => {
-                  console.log('State dropdown pressed'); // Debug log
-                  setShowStateModal(true);
-                }}
+                onPress={() => setShowStateModal(true)}
                 activeOpacity={0.7}
               >
                 <Text
@@ -534,10 +523,7 @@ const SignUpScreen = ({ navigation }) => {
                   styles.dropdown,
                   errors.rateType && styles.inputError,
                 ]}
-                onPress={() => {
-                  console.log('Rate type dropdown pressed'); // Debug log
-                  setShowRateTypeModal(true);
-                }}
+                onPress={() => setShowRateTypeModal(true)}
                 activeOpacity={0.7}
               >
                 <Text

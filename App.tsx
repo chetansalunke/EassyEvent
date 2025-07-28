@@ -31,27 +31,47 @@ const AuthNavigator = () => {
       screenOptions={{
         headerShown: false,
         animation: 'slide_from_right',
+        gestureEnabled: false, // Disable swipe back gesture for better control
       }}
     >
-      {isAuthenticated ? (
-        // Authenticated screens
-        <>
-          <Stack.Screen name="Home" component={HomeScreen} />
-          <Stack.Screen name="EditBooking" component={EditBookingScreen} />
-          <Stack.Screen
-            name="DateTimePicker"
-            component={DateTimePickerScreen}
-          />
-        </>
-      ) : (
-        // Non-authenticated screens
-        <>
-          <Stack.Screen name="Splash" component={SplashScreen} />
-          <Stack.Screen name="Login" component={LoginScreen} />
-          <Stack.Screen name="SignUp" component={SignUpScreen} />
-          <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
-        </>
-      )}
+      {/* Authentication Screens */}
+      <Stack.Screen
+        name="Splash"
+        component={SplashScreen}
+        options={{ gestureEnabled: false }}
+      />
+      <Stack.Screen
+        name="Login"
+        component={LoginScreen}
+        options={{ gestureEnabled: false }}
+      />
+      <Stack.Screen
+        name="SignUp"
+        component={SignUpScreen}
+        options={{ gestureEnabled: true }} // Allow back from signup to login
+      />
+      <Stack.Screen
+        name="ResetPassword"
+        component={ResetPasswordScreen}
+        options={{ gestureEnabled: true }} // Allow back from reset to login
+      />
+
+      {/* Authenticated Screens */}
+      <Stack.Screen
+        name="Home"
+        component={HomeScreen}
+        options={{ gestureEnabled: false }} // Prevent back navigation from home
+      />
+      <Stack.Screen
+        name="EditBooking"
+        component={EditBookingScreen}
+        options={{ gestureEnabled: true }}
+      />
+      <Stack.Screen
+        name="DateTimePicker"
+        component={DateTimePickerScreen}
+        options={{ gestureEnabled: true }}
+      />
     </Stack.Navigator>
   );
 };

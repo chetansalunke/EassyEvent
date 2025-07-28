@@ -14,9 +14,7 @@ import {
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { colors } from '../utils/colors';
 import { useAuth } from '../context/AuthContext';
-import { apiRequest } from '../config/apiConfig';
 import API_CONFIG from '../config/apiConfig';
-import { handleApiError } from '../utils/networkUtils';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -34,11 +32,14 @@ const LoginScreen = ({ navigation }) => {
     setIsLoading(true);
 
     try {
-      // API call to login using enhanced API function
-      const { response, data: result } = await apiRequest(
-        API_CONFIG.ENDPOINTS.LOGIN,
+      const response = await fetch(
+        `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.LOGIN}`,
         {
           method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
           body: JSON.stringify({
             email: email.toLowerCase().trim(),
             password: password,
@@ -46,33 +47,29 @@ const LoginScreen = ({ navigation }) => {
         },
       );
 
-      if (response.ok && result.token) {
-        // Login successful
-        const success = await login(result.token, result.venue_data);
+      const result = await response.json();
 
+      if (response.ok && result.token) {
+        const success = await login(result.token, result.venue_data);
         if (success) {
-          // Navigation will be handled by the auth state change
-          navigation.navigate('Home');
+          // Reset navigation stack and navigate to Home - prevents back navigation to login
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Home' }],
+          });
         } else {
           Alert.alert('Error', 'Failed to save login data. Please try again.');
         }
       } else {
-        // Handle error response
-        let errorMessage = 'Login failed. Please try again.';
-
-        if (result.error) {
-          errorMessage = result.error;
-        } else if (result.message) {
-          errorMessage = result.message;
-        }
-
-        console.log('Login error:', errorMessage);
+        const errorMessage =
+          result.error || result.message || 'Login failed. Please try again.';
         Alert.alert('Login Failed', errorMessage);
       }
     } catch (error) {
-      console.error('Login error:', error);
-
-      const errorMessage = handleApiError(error);
+      let errorMessage = 'Login failed. Please try again.';
+      if (error.message.includes('Network request failed')) {
+        errorMessage = 'Network error. Please check your internet connection.';
+      }
       Alert.alert('Login Failed', errorMessage);
     } finally {
       setIsLoading(false);
