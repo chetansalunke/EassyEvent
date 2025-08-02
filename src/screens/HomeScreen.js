@@ -422,7 +422,11 @@ const HomeScreen = ({ navigation }) => {
             <View style={styles.quickActionsGrid}>
               <TouchableOpacity
                 style={styles.quickActionCard}
-                onPress={() => navigation.navigate('EditBooking')}
+                onPress={() =>
+                  navigation.navigate('EditBooking', {
+                    isEdit: false,
+                  })
+                }
               >
                 <Ionicons name="add-circle" size={32} color={colors.primary} />
                 <Text style={styles.quickActionText} numberOfLines={2}>

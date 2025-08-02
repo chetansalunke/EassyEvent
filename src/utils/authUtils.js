@@ -1,4 +1,5 @@
 import API_CONFIG from '../config/apiConfig';
+import { EventsAPI } from '../services/eventsApi';
 
 // Simple logout API call utility
 export const callLogoutAPI = async token => {
@@ -117,149 +118,29 @@ export const updateVenueDetails = async (token, venueData) => {
   }
 };
 
-// Events API utilities
+// Events API utilities - Using EventsAPI service
 export const getEventStatistics = async token => {
-  try {
-    const response = await fetch(
-      `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.EVENTS_STATS}`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          Authorization: `Token ${token}`,
-        },
-      },
-    );
-
-    if (response.ok) {
-      const result = await response.json();
-      return { success: true, data: result };
-    } else {
-      const errorData = await response.json().catch(() => ({}));
-      return {
-        success: false,
-        error:
-          errorData.message || errorData.error || 'Failed to get statistics',
-      };
-    }
-  } catch (error) {
-    console.error('Get event statistics error:', error);
-    return {
-      success: false,
-      error: error.message.includes('Network request failed')
-        ? 'Network error. Please check your connection.'
-        : 'Failed to get statistics',
-    };
-  }
+  return await EventsAPI.getEventsStats(token);
 };
 
 export const addEvent = async (token, eventData) => {
-  try {
-    const response = await fetch(
-      `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.EVENTS_POST}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          Authorization: `Token ${token}`,
-        },
-        body: JSON.stringify(eventData),
-      },
-    );
-
-    if (response.ok) {
-      const result = await response.json();
-      return { success: true, data: result };
-    } else {
-      const errorData = await response.json().catch(() => ({}));
-      return {
-        success: false,
-        error: errorData.message || errorData.error || 'Failed to add event',
-      };
-    }
-  } catch (error) {
-    console.error('Add event error:', error);
-    return {
-      success: false,
-      error: error.message.includes('Network request failed')
-        ? 'Network error. Please check your connection.'
-        : 'Failed to add event',
-    };
-  }
+  return await EventsAPI.createEvent(eventData, token);
 };
 
 export const getEventDetails = async (token, eventId) => {
-  try {
-    const response = await fetch(
-      `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.EVENTS_GET}${eventId}/`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          Authorization: `Token ${token}`,
-        },
-      },
-    );
+  return await EventsAPI.getEvent(eventId, token);
+};
 
-    if (response.ok) {
-      const result = await response.json();
-      return { success: true, data: result };
-    } else {
-      const errorData = await response.json().catch(() => ({}));
-      return {
-        success: false,
-        error:
-          errorData.message || errorData.error || 'Failed to get event details',
-      };
-    }
-  } catch (error) {
-    console.error('Get event details error:', error);
-    return {
-      success: false,
-      error: error.message.includes('Network request failed')
-        ? 'Network error. Please check your connection.'
-        : 'Failed to get event details',
-    };
-  }
+export const getAllEvents = async token => {
+  return await EventsAPI.getAllEvents(token);
+};
+
+export const deleteEvent = async (token, eventId) => {
+  return await EventsAPI.deleteEvent(eventId, token);
 };
 
 export const updateEvent = async (token, eventId, eventData) => {
-  try {
-    const response = await fetch(
-      `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.EVENTS_PUT}${eventId}/`,
-      {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          Authorization: `Token ${token}`,
-        },
-        body: JSON.stringify(eventData),
-      },
-    );
-
-    if (response.ok) {
-      const result = await response.json();
-      return { success: true, data: result };
-    } else {
-      const errorData = await response.json().catch(() => ({}));
-      return {
-        success: false,
-        error: errorData.message || errorData.error || 'Failed to update event',
-      };
-    }
-  } catch (error) {
-    console.error('Update event error:', error);
-    return {
-      success: false,
-      error: error.message.includes('Network request failed')
-        ? 'Network error. Please check your connection.'
-        : 'Failed to update event',
-    };
-  }
+  return await EventsAPI.updateEvent(eventId, eventData, token);
 };
 
 export default {
@@ -269,5 +150,7 @@ export default {
   getEventStatistics,
   addEvent,
   getEventDetails,
+  getAllEvents,
   updateEvent,
+  deleteEvent,
 };

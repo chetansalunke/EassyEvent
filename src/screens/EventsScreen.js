@@ -9,90 +9,165 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  FlatList,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { colors } from '../utils/colors';
 import { useAuth } from '../context/AuthContext';
-import { addEvent, getEventDetails } from '../utils/authUtils';
+import { getAllEvents, deleteEvent } from '../utils/authUtils';
+import { PAYMENT_STATUS_OPTIONS } from '../services/eventsApi';
 
 const EventsScreen = ({ navigation }) => {
-  const [isLoading, setIsLoading] = useState(false);
+  const insets = useSafeAreaInsets();
+  const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [events, setEvents] = useState([]);
   const { token } = useAuth();
 
-  // Sample events data (in real app, this would come from API)
-  const sampleEvents = [
-    {
-      id: 1,
-      name: "Anil's Wedding",
-      from_date: '2025-07-25',
-      from_time: '14:30:00',
-      to_date: '2025-07-27',
-      to_time: '10:00:00',
-      payment_status: 'fully_paid',
-      number_of_people: 150,
-      amount_received: 5000,
-      amount_pending: 0,
-    },
-    {
-      id: 2,
-      name: 'Corporate Meeting',
-      from_date: '2025-08-01',
-      from_time: '09:00:00',
-      to_date: '2025-08-01',
-      to_time: '17:00:00',
-      payment_status: 'partially_paid',
-      number_of_people: 50,
-      amount_received: 2000,
-      amount_pending: 1000,
-    },
-  ];
-
+  // Load events on component mount
   useEffect(() => {
-    setEvents(sampleEvents);
+    loadEvents();
   }, []);
+
+  // Focus listener to reload events when returning to screen
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadEvents();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
+  const loadEvents = async () => {
+    if (!token) return;
+
+    try {
+      setIsLoading(true);
+      const result = await getAllEvents(token);
+
+      if (result.success) {
+        setEvents(result.data || []);
+      } else {
+        Alert.alert('Error', result.error || 'Failed to load events');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to load events');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const onRefresh = async () => {
     setIsRefreshing(true);
-    // In real app, fetch events from API
-    setTimeout(() => setIsRefreshing(false), 1000);
+    await loadEvents();
+    setIsRefreshing(false);
   };
 
-  const getStatusColor = status => {
+  const handleEditEvent = event => {
+    navigation.navigate('EditBooking', {
+      isEdit: true,
+      eventId: event.id,
+    });
+  };
+
+  const handleDeleteEvent = event => {
+    Alert.alert(
+      'Delete Event',
+      `Are you sure you want to delete "${event.name}"?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await deleteEvent(token, event.id);
+              if (result.success) {
+                Alert.alert('Success', 'Event deleted successfully');
+                loadEvents(); // Reload events
+              } else {
+                Alert.alert('Error', result.error || 'Failed to delete event');
+              }
+            } catch (error) {
+              Alert.alert('Error', 'Failed to delete event');
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const getPaymentStatusLabel = status => {
+    const option = PAYMENT_STATUS_OPTIONS.find(opt => opt.value === status);
+    return option ? option.label : status;
+  };
+
+  const getPaymentStatusColor = status => {
     switch (status) {
       case 'fully_paid':
         return colors.success;
       case 'partially_paid':
         return colors.warning;
       case 'pending':
+        return colors.info;
+      case 'overdue':
         return colors.error;
       default:
         return colors.gray;
     }
   };
 
-  const getStatusText = status => {
-    switch (status) {
-      case 'fully_paid':
-        return 'Fully Paid';
-      case 'partially_paid':
-        return 'Partially Paid';
-      case 'pending':
-        return 'Pending';
-      default:
-        return status;
-    }
-  };
-
   const formatDate = dateString => {
+    if (!dateString) return '';
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
+      month: 'short',
+      day: 'numeric',
     });
   };
+
+  const formatTime = timeString => {
+    if (!timeString) return '';
+    return timeString.substring(0, 5); // Remove seconds
+  };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.secondary} />
+          </TouchableOpacity>
+
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>Events</Text>
+            <Text style={styles.headerSubtitle}>
+              Manage your venue bookings
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => navigation.navigate('EditBooking')}
+          >
+            <Ionicons name="add" size={24} color={colors.background} />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading events...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -128,7 +203,12 @@ const EventsScreen = ({ navigation }) => {
           />
         }
       >
-        {events.length === 0 ? (
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Loading events...</Text>
+          </View>
+        ) : events.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="calendar-outline" size={64} color={colors.gray} />
             <Text style={styles.emptyTitle}>No Events Yet</Text>
@@ -143,77 +223,109 @@ const EventsScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         ) : (
-          events.map(event => (
-            <TouchableOpacity
-              key={event.id}
-              style={styles.eventCard}
-              onPress={() => navigation.navigate('EditBooking', { event })}
-            >
-              <View style={styles.eventHeader}>
-                <Text style={styles.eventName}>{event.name}</Text>
-                <View
-                  style={[
-                    styles.statusBadge,
-                    {
-                      backgroundColor: `${getStatusColor(
-                        event.payment_status,
-                      )}20`,
-                    },
-                  ]}
-                >
-                  <Text
+          <FlatList
+            data={events}
+            keyExtractor={item => item.id.toString()}
+            renderItem={({ item: event }) => (
+              <TouchableOpacity
+                style={styles.eventCard}
+                onPress={() =>
+                  navigation.navigate('EditBooking', {
+                    isEdit: true,
+                    eventId: event.id,
+                    event,
+                  })
+                }
+              >
+                <View style={styles.eventHeader}>
+                  <Text style={styles.eventName} numberOfLines={2}>
+                    {event.name}
+                  </Text>
+                  <View style={styles.eventActions}>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={e => {
+                        e.stopPropagation();
+                        handleEditEvent(event);
+                      }}
+                    >
+                      <Ionicons
+                        name="pencil"
+                        size={20}
+                        color={colors.primary}
+                      />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={e => {
+                        e.stopPropagation();
+                        handleDeleteEvent(event);
+                      }}
+                    >
+                      <Ionicons name="trash" size={20} color={colors.error} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <View style={styles.eventDetails}>
+                  <View style={styles.eventDetailRow}>
+                    <Ionicons name="calendar" size={16} color={colors.gray} />
+                    <Text style={styles.eventDetailText}>
+                      {formatDate(event.from_date)} at{' '}
+                      {formatTime(event.from_time)}
+                    </Text>
+                  </View>
+
+                  <View style={styles.eventDetailRow}>
+                    <Ionicons name="time" size={16} color={colors.gray} />
+                    <Text style={styles.eventDetailText}>
+                      Until {formatDate(event.to_date)} at{' '}
+                      {formatTime(event.to_time)}
+                    </Text>
+                  </View>
+
+                  <View style={styles.eventDetailRow}>
+                    <Ionicons name="people" size={16} color={colors.gray} />
+                    <Text style={styles.eventDetailText}>
+                      {event.number_of_people || 0} people
+                    </Text>
+                  </View>
+
+                  <View style={styles.eventDetailRow}>
+                    <Ionicons name="cash" size={16} color={colors.gray} />
+                    <Text style={styles.eventDetailText}>
+                      ₹{(event.amount_received || 0).toLocaleString()} received
+                      {event.amount_pending > 0 &&
+                        `, ₹${event.amount_pending.toLocaleString()} pending`}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.eventFooter}>
+                  <View
                     style={[
-                      styles.statusText,
-                      { color: getStatusColor(event.payment_status) },
+                      styles.paymentStatusBadge,
+                      {
+                        backgroundColor:
+                          getPaymentStatusColor(event.payment_status) + '20',
+                      },
                     ]}
                   >
-                    {getStatusText(event.payment_status)}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.eventDetails}>
-                <View style={styles.eventRow}>
-                  <Ionicons name="calendar" size={16} color={colors.gray} />
-                  <Text style={styles.eventDetailText}>
-                    {formatDate(event.from_date)} - {formatDate(event.to_date)}
-                  </Text>
-                </View>
-
-                <View style={styles.eventRow}>
-                  <Ionicons name="time" size={16} color={colors.gray} />
-                  <Text style={styles.eventDetailText}>
-                    {event.from_time} - {event.to_time}
-                  </Text>
-                </View>
-
-                <View style={styles.eventRow}>
-                  <Ionicons name="people" size={16} color={colors.gray} />
-                  <Text style={styles.eventDetailText}>
-                    {event.number_of_people} guests
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.eventFooter}>
-                <View style={styles.amountInfo}>
-                  <Text style={styles.amountReceived}>
-                    ₹{event.amount_received?.toLocaleString()} received
-                  </Text>
-                  {event.amount_pending > 0 && (
-                    <Text style={styles.amountPending}>
-                      ₹{event.amount_pending?.toLocaleString()} pending
+                    <Text
+                      style={[
+                        styles.paymentStatusText,
+                        { color: getPaymentStatusColor(event.payment_status) },
+                      ]}
+                    >
+                      {getPaymentStatusLabel(event.payment_status)}
                     </Text>
-                  )}
+                  </View>
                 </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={20}
-                  color={colors.gray}
-                />
-              </View>
-            </TouchableOpacity>
-          ))
+              </TouchableOpacity>
+            )}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.listContent}
+          />
         )}
       </ScrollView>
     </SafeAreaView>
@@ -266,6 +378,20 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: colors.gray,
+    marginTop: 12,
+  },
+  listContent: {
+    paddingBottom: 20,
   },
   emptyState: {
     flex: 1,
@@ -323,19 +449,20 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 12,
   },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+  eventActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
+  actionButton: {
+    padding: 8,
+    marginLeft: 4,
+    borderRadius: 8,
+    backgroundColor: colors.lightGray,
   },
   eventDetails: {
     marginBottom: 12,
   },
-  eventRow: {
+  eventDetailRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 6,
@@ -350,18 +477,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  amountInfo: {
-    flex: 1,
+  paymentStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
-  amountReceived: {
-    fontSize: 14,
-    color: colors.success,
-    fontWeight: '600',
-  },
-  amountPending: {
+  paymentStatusText: {
     fontSize: 12,
-    color: colors.warning,
-    marginTop: 2,
+    fontWeight: '600',
   },
 });
 
