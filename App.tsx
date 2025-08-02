@@ -1,7 +1,11 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { StatusBar } from 'react-native';
+import { StatusBar, Platform } from 'react-native';
+import {
+  SafeAreaProvider,
+  initialWindowMetrics,
+} from 'react-native-safe-area-context';
 
 // Import all screen components
 import SplashScreen from './src/screens/SplashScreen';
@@ -34,6 +38,9 @@ const AuthNavigator = () => {
         headerShown: false, // Default to no header
         animation: 'slide_from_right',
         gestureEnabled: true, // Enable swipe back gesture
+        contentStyle: {
+          backgroundColor: '#FFFFFF', // Ensure consistent background
+        },
         headerStyle: {
           backgroundColor: '#FFFFFF',
         },
@@ -113,12 +120,18 @@ const AuthNavigator = () => {
 
 const App = () => {
   return (
-    <AuthProvider>
-      <NavigationContainer>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-        <AuthNavigator />
-      </NavigationContainer>
-    </AuthProvider>
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+      <AuthProvider>
+        <NavigationContainer>
+          <StatusBar
+            barStyle="dark-content"
+            backgroundColor={Platform.OS === 'android' ? '#FFFFFF' : undefined}
+            translucent={Platform.OS === 'android'}
+          />
+          <AuthNavigator />
+        </NavigationContainer>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 };
 

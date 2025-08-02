@@ -14,6 +14,7 @@ import {
   StatusBar,
   Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { colors } from '../utils/colors';
 import { useAuth } from '../context/AuthContext';
@@ -30,6 +31,7 @@ const statusBarHeight =
   StatusBar.currentHeight || (Platform.OS === 'ios' ? 44 : 24);
 
 const HomeScreen = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const [selectedTab, setSelectedTab] = useState(0);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -251,32 +253,58 @@ const HomeScreen = ({ navigation }) => {
   // Render loading state
   if (isLoading && !dashboardStats) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View
+        style={[
+          styles.container,
+          {
+            paddingTop: insets.top,
+            paddingBottom: insets.bottom,
+            paddingLeft: insets.left,
+            paddingRight: insets.right,
+          },
+        ]}
+      >
+        <StatusBar
+          barStyle="dark-content"
+          backgroundColor={colors.background}
+        />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading dashboard...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        {
+          paddingTop: insets.top,
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
+        },
+      ]}
+    >
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
 
       {/* Adaptive Top Navigation Header */}
-      <View style={[styles.header, isTablet && styles.headerTablet]}>
+      <View
+        style={[
+          styles.header,
+          isTablet && styles.headerTablet,
+          { paddingTop: Math.max(insets.top * 0.3, 8) }, // Add some top padding based on safe area
+        ]}
+      >
         <View style={styles.headerLeft}>
-          <Text
-            style={[styles.welcomeText, isTablet && styles.welcomeTextTablet]}
-          >
-            Welcome back!
-          </Text>
           <Text
             style={[
               styles.venueNameText,
               isTablet && styles.venueNameTextTablet,
             ]}
+            numberOfLines={2}
+            adjustsFontSizeToFit
           >
             {venueDetails?.venue_name || user?.venue_name || 'Your Venue'}
           </Text>
@@ -312,7 +340,17 @@ const HomeScreen = ({ navigation }) => {
 
       <View style={styles.screen}>
         <ScrollView
-          style={styles.homeContent}
+          style={[
+            styles.homeContent,
+            // Add horizontal padding for devices with curved edges
+            {
+              paddingHorizontal: Math.max(
+                20,
+                insets.left + 20,
+                insets.right + 20,
+              ),
+            },
+          ]}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -331,17 +369,18 @@ const HomeScreen = ({ navigation }) => {
                 <Text style={styles.venueTitle}>Venue Information</Text>
               </View>
               <View style={styles.venueInfo}>
-                <Text style={styles.venueInfoText}>
+                <Text style={styles.venueInfoText} numberOfLines={2}>
                   <Text style={styles.venueInfoLabel}>Rate: </Text>₹
-                  {venueDetails.rate?.toLocaleString()} {venueDetails.rate_type}
+                  {venueDetails.rate?.toLocaleString() || '0'} per{' '}
+                  {venueDetails.rate_type || 'day'}
                 </Text>
-                <Text style={styles.venueInfoText}>
+                <Text style={styles.venueInfoText} numberOfLines={2}>
                   <Text style={styles.venueInfoLabel}>Capacity: </Text>
-                  {venueDetails.seating_capacity} guests
+                  {venueDetails.seating_capacity || 'N/A'} guests
                 </Text>
-                <Text style={styles.venueInfoText}>
+                <Text style={styles.venueInfoText} numberOfLines={2}>
                   <Text style={styles.venueInfoLabel}>Location: </Text>
-                  {venueDetails.city}, {venueDetails.state}
+                  {venueDetails.city || 'N/A'}, {venueDetails.state || 'N/A'}
                 </Text>
               </View>
             </View>
@@ -353,11 +392,25 @@ const HomeScreen = ({ navigation }) => {
               <View key={index} style={styles.statCard}>
                 <View style={styles.statHeader}>
                   <Ionicons name={stat.icon} size={24} color={stat.color} />
-                  <Text style={styles.statTitle}>{stat.title}</Text>
+                  <Text
+                    style={styles.statTitle}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                  >
+                    {stat.title}
+                  </Text>
                 </View>
-                <Text style={styles.statNumber}>{stat.number}</Text>
+                <Text
+                  style={styles.statNumber}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                >
+                  {stat.number}
+                </Text>
                 {stat.subtitle && (
-                  <Text style={styles.statSubtitle}>{stat.subtitle}</Text>
+                  <Text style={styles.statSubtitle} numberOfLines={2}>
+                    {stat.subtitle}
+                  </Text>
                 )}
               </View>
             ))}
@@ -372,7 +425,9 @@ const HomeScreen = ({ navigation }) => {
                 onPress={() => navigation.navigate('EditBooking')}
               >
                 <Ionicons name="add-circle" size={32} color={colors.primary} />
-                <Text style={styles.quickActionText}>Add Event</Text>
+                <Text style={styles.quickActionText} numberOfLines={2}>
+                  Add Event
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -380,7 +435,9 @@ const HomeScreen = ({ navigation }) => {
                 onPress={() => setSelectedTab(2)}
               >
                 <Ionicons name="settings" size={32} color={colors.success} />
-                <Text style={styles.quickActionText}>Venue Settings</Text>
+                <Text style={styles.quickActionText} numberOfLines={2}>
+                  Venue Settings
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -388,7 +445,9 @@ const HomeScreen = ({ navigation }) => {
                 onPress={() => setSelectedTab(1)}
               >
                 <Ionicons name="calendar" size={32} color={colors.warning} />
-                <Text style={styles.quickActionText}>View Events</Text>
+                <Text style={styles.quickActionText} numberOfLines={2}>
+                  View Events
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -396,7 +455,9 @@ const HomeScreen = ({ navigation }) => {
                 onPress={() => onRefresh()}
               >
                 <Ionicons name="refresh" size={32} color={colors.info} />
-                <Text style={styles.quickActionText}>Refresh Data</Text>
+                <Text style={styles.quickActionText} numberOfLines={2}>
+                  Refresh Data
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -408,6 +469,12 @@ const HomeScreen = ({ navigation }) => {
             styles.tabBar,
             isTablet && styles.tabBarTablet,
             isSmallDevice && styles.tabBarSmall,
+            {
+              paddingBottom: Math.max(
+                insets.bottom + (isSmallDevice ? 8 : 12),
+                isSmallDevice ? 16 : 20, // Minimum bottom padding
+              ),
+            },
           ]}
         >
           {tabs.map((tab, index) => (
@@ -467,6 +534,8 @@ const HomeScreen = ({ navigation }) => {
                     isTablet && styles.tabLabelTablet,
                     selectedTab === index && styles.activeTabLabel,
                   ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
                 >
                   {tab.label}
                 </Text>
@@ -475,7 +544,7 @@ const HomeScreen = ({ navigation }) => {
           ))}
         </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -495,6 +564,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    minHeight: 60, // Ensure minimum header height
     ...Platform.select({
       ios: {
         shadowColor: colors.shadow,
@@ -605,7 +675,7 @@ const styles = StyleSheet.create({
   },
   homeContent: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingTop: 8, // Add some top padding for better spacing
   },
 
   // Venue Card Styles
@@ -614,6 +684,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 20,
+    marginTop: 16,
     shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -632,14 +703,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.secondary,
     marginLeft: 8,
+    flex: 1,
   },
   venueInfo: {
-    gap: 8,
+    gap: 10,
   },
   venueInfoText: {
     fontSize: 14,
     color: colors.secondary,
     lineHeight: 20,
+    flexWrap: 'wrap',
   },
   venueInfoLabel: {
     fontWeight: '600',
@@ -671,22 +744,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
+    flex: 1,
   },
   statTitle: {
     fontSize: 12,
     color: colors.gray,
     marginLeft: 8,
     fontWeight: '500',
+    flex: 1,
+    flexWrap: 'wrap',
   },
   statNumber: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: colors.secondary,
     marginBottom: 4,
+    flexWrap: 'wrap',
   },
   statSubtitle: {
     fontSize: 10,
     color: colors.gray,
+    lineHeight: 14,
   },
 
   // Quick Actions
@@ -719,6 +797,9 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
     fontWeight: '500',
+    lineHeight: 16,
+    minHeight: 32, // Ensure consistent height for text
+    maxWidth: '100%', // Ensure text doesn't overflow
   },
 
   sectionTitle: {
@@ -736,10 +817,6 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     paddingVertical: isSmallDevice ? 8 : 12,
     paddingHorizontal: isSmallDevice ? 8 : 20,
-    paddingBottom: Platform.select({
-      ios: isSmallDevice ? 20 : 28, // Account for home indicator
-      android: isSmallDevice ? 8 : 12,
-    }),
     ...Platform.select({
       ios: {
         shadowColor: colors.shadow,
@@ -755,15 +832,10 @@ const styles = StyleSheet.create({
   tabBarTablet: {
     paddingVertical: 16,
     paddingHorizontal: 32,
-    paddingBottom: 24,
   },
   tabBarSmall: {
     paddingVertical: 6,
     paddingHorizontal: 4,
-    paddingBottom: Platform.select({
-      ios: 18,
-      android: 6,
-    }),
   },
   tabItem: {
     flex: 1,
