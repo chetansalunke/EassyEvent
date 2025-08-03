@@ -14,21 +14,49 @@ import {
   Platform,
   KeyboardAvoidingView,
   RefreshControl,
+  Image,
+  FlatList,
+  Dimensions,
+  PermissionsAndroid,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
+import {
+  check,
+  request,
+  openSettings,
+  PERMISSIONS,
+  RESULTS,
+} from 'react-native-permissions';
 import { colors } from '../utils/colors';
 import { useAuth } from '../context/AuthContext';
 import { getVenueDetails, updateVenueDetails } from '../utils/authUtils';
+import {
+  uploadVenueImages,
+  getVenueImages,
+  deleteVenueImage,
+} from '../services/venueImagesApi';
 import { getScreenSafeArea } from '../utils/safeArea';
 
-const ProfileScreen = ({ navigation }) => {
+const { width } = Dimensions.get('window');
+
+const VenueScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [venueDetails, setVenueDetails] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+
+  // Image gallery states
+  const [venueImages, setVenueImages] = useState([]);
+  const [isLoadingImages, setIsLoadingImages] = useState(false);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const [showImageGallery, setShowImageGallery] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+
   const [editFormData, setEditFormData] = useState({
     venue_name: '',
     phone: '',
@@ -65,12 +93,404 @@ const ProfileScreen = ({ navigation }) => {
 
   useEffect(() => {
     loadVenueDetails();
+    loadVenueImages();
   }, [token]);
+
+  // Load venue images
+  const loadVenueImages = async () => {
+    if (!token) return;
+
+    try {
+      setIsLoadingImages(true);
+      const result = await getVenueImages(token);
+
+      if (result.success) {
+        setVenueImages(result.data);
+      } else {
+        console.warn('Failed to load venue images:', result.error);
+      }
+    } catch (error) {
+      console.error('Error loading venue images:', error);
+    } finally {
+      setIsLoadingImages(false);
+    }
+  };
 
   const onRefresh = async () => {
     setIsRefreshing(true);
-    await loadVenueDetails();
+    await Promise.all([loadVenueDetails(), loadVenueImages()]);
     setIsRefreshing(false);
+  };
+
+  // Check if permissions are already granted using react-native-permissions
+  const checkPermissions = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const androidVersion = Platform.Version;
+        let storagePermission;
+
+        if (androidVersion >= 33) {
+          storagePermission = PERMISSIONS.ANDROID.READ_MEDIA_IMAGES;
+        } else {
+          storagePermission = PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE;
+        }
+
+        const storageStatus = await check(storagePermission);
+        const cameraStatus = await check(PERMISSIONS.ANDROID.CAMERA);
+
+        console.log('Storage permission status:', storageStatus);
+        console.log('Camera permission status:', cameraStatus);
+
+        return {
+          storage: storageStatus === RESULTS.GRANTED,
+          camera: cameraStatus === RESULTS.GRANTED,
+          storageStatus,
+          cameraStatus,
+        };
+      } catch (err) {
+        console.warn('Permission check error:', err);
+        return {
+          storage: false,
+          camera: false,
+          storageStatus: 'error',
+          cameraStatus: 'error',
+        };
+      }
+    } else {
+      // iOS
+      const cameraStatus = await check(PERMISSIONS.IOS.CAMERA);
+      const photoStatus = await check(PERMISSIONS.IOS.PHOTO_LIBRARY);
+
+      return {
+        storage: photoStatus === RESULTS.GRANTED,
+        camera: cameraStatus === RESULTS.GRANTED,
+        storageStatus: photoStatus,
+        cameraStatus,
+      };
+    }
+  };
+
+  // Request camera/gallery permissions
+  const requestPermissions = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const androidVersion = Platform.Version;
+        let storagePermission;
+
+        if (androidVersion >= 33) {
+          storagePermission = PERMISSIONS.ANDROID.READ_MEDIA_IMAGES;
+        } else {
+          storagePermission = PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE;
+        }
+
+        const storageStatus = await check(storagePermission);
+
+        if (storageStatus === RESULTS.GRANTED) {
+          return true;
+        }
+
+        if (storageStatus === RESULTS.BLOCKED) {
+          Alert.alert(
+            'Permission Required',
+            'Gallery permission is required to select photos. Please enable it in app settings.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Open Settings',
+                onPress: () => openSettings(),
+              },
+            ],
+          );
+          return false;
+        }
+
+        const requestResult = await request(storagePermission);
+        return requestResult === RESULTS.GRANTED;
+      } catch (err) {
+        console.warn('Permission request error:', err);
+        return false;
+      }
+    } else {
+      // iOS
+      const photoStatus = await check(PERMISSIONS.IOS.PHOTO_LIBRARY);
+
+      if (photoStatus === RESULTS.GRANTED) {
+        return true;
+      }
+
+      if (photoStatus === RESULTS.BLOCKED) {
+        Alert.alert(
+          'Permission Required',
+          'Photo library access is required to select photos. Please enable it in app settings.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Open Settings',
+              onPress: () => openSettings(),
+            },
+          ],
+        );
+        return false;
+      }
+
+      const requestResult = await request(PERMISSIONS.IOS.PHOTO_LIBRARY);
+      return requestResult === RESULTS.GRANTED;
+    }
+  };
+
+  // Handle image selection from gallery
+  const handleSelectImages = async () => {
+    Alert.alert('Select Images', 'Choose an option', [
+      {
+        text: 'Camera',
+        onPress: () => openCamera(),
+      },
+      {
+        text: 'Gallery',
+        onPress: () => openGallery(),
+      },
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+    ]);
+  };
+
+  // Open camera
+  const openCamera = async () => {
+    const hasPermission = await requestCameraPermission();
+    if (!hasPermission) {
+      Alert.alert(
+        'Permission Denied',
+        'Please grant camera permission to take photos',
+      );
+      return;
+    }
+
+    const options = {
+      mediaType: 'photo',
+      quality: 0.8,
+      includeBase64: false,
+    };
+
+    launchCamera(options, response => {
+      if (response.didCancel) {
+        console.log('User cancelled camera');
+      } else if (response.error) {
+        console.log('Camera Error: ', response.error);
+        Alert.alert('Error', 'Failed to take photo');
+      } else if (response.assets && response.assets.length > 0) {
+        uploadImages(response.assets);
+      }
+    });
+  };
+
+  // Open gallery
+  const openGallery = async () => {
+    const hasPermission = await requestPermissions();
+    if (!hasPermission) {
+      Alert.alert(
+        'Permission Denied',
+        'Please grant gallery permission to select images',
+      );
+      return;
+    }
+
+    const options = {
+      mediaType: 'photo',
+      quality: 0.8,
+      selectionLimit: 5, // Allow multiple image selection
+      includeBase64: false,
+    };
+
+    launchImageLibrary(options, response => {
+      if (response.didCancel) {
+        console.log('User cancelled image picker');
+      } else if (response.error) {
+        console.log('ImagePicker Error: ', response.error);
+        Alert.alert('Error', 'Failed to select images');
+      } else if (response.assets && response.assets.length > 0) {
+        uploadImages(response.assets);
+      }
+    });
+  };
+
+  // Debug function to check current permission status
+  const debugPermissions = async () => {
+    const permissions = await checkPermissions();
+    const platform = Platform.OS;
+    const version = Platform.Version;
+
+    let statusText = `Platform: ${platform}\nVersion: ${version}\n\n`;
+    statusText += `Storage/Photos Permission: ${
+      permissions.storage ? 'Granted' : 'Denied'
+    }\n`;
+    statusText += `Storage Status: ${permissions.storageStatus}\n\n`;
+    statusText += `Camera Permission: ${
+      permissions.camera ? 'Granted' : 'Denied'
+    }\n`;
+    statusText += `Camera Status: ${permissions.cameraStatus}\n\n`;
+
+    if (platform === 'android' && version >= 33) {
+      statusText += 'Using: READ_MEDIA_IMAGES (Android 13+)';
+    } else if (platform === 'android') {
+      statusText += 'Using: READ_EXTERNAL_STORAGE';
+    } else {
+      statusText += 'Using: iOS Photo Library & Camera';
+    }
+
+    const hasBlockedPermissions =
+      permissions.storageStatus === RESULTS.BLOCKED ||
+      permissions.cameraStatus === RESULTS.BLOCKED;
+
+    Alert.alert('Permission Status', statusText, [
+      ...(hasBlockedPermissions
+        ? [
+            {
+              text: 'Open Settings',
+              onPress: () => openSettings(),
+            },
+          ]
+        : []),
+      {
+        text: 'Test Gallery',
+        onPress: () => openGallery(),
+      },
+      {
+        text: 'Test Camera',
+        onPress: () => openCamera(),
+      },
+      { text: 'OK', style: 'cancel' },
+    ]);
+  };
+  // Request camera permission
+  const requestCameraPermission = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const cameraStatus = await check(PERMISSIONS.ANDROID.CAMERA);
+
+        if (cameraStatus === RESULTS.GRANTED) {
+          return true;
+        }
+
+        if (cameraStatus === RESULTS.BLOCKED) {
+          Alert.alert(
+            'Permission Required',
+            'Camera permission is required to take photos. Please enable it in app settings.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Open Settings',
+                onPress: () => openSettings(),
+              },
+            ],
+          );
+          return false;
+        }
+
+        const requestResult = await request(PERMISSIONS.ANDROID.CAMERA);
+        return requestResult === RESULTS.GRANTED;
+      } catch (err) {
+        console.warn('Camera permission request error:', err);
+        return false;
+      }
+    } else {
+      // iOS
+      const cameraStatus = await check(PERMISSIONS.IOS.CAMERA);
+
+      if (cameraStatus === RESULTS.GRANTED) {
+        return true;
+      }
+
+      if (cameraStatus === RESULTS.BLOCKED) {
+        Alert.alert(
+          'Permission Required',
+          'Camera access is required to take photos. Please enable it in app settings.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Open Settings',
+              onPress: () => openSettings(),
+            },
+          ],
+        );
+        return false;
+      }
+
+      const requestResult = await request(PERMISSIONS.IOS.CAMERA);
+      return requestResult === RESULTS.GRANTED;
+    }
+  };
+
+  // Upload selected images
+  const uploadImages = async selectedImages => {
+    if (!token) {
+      Alert.alert('Error', 'Authentication required');
+      return;
+    }
+
+    setIsUploadingImages(true);
+    try {
+      const result = await uploadVenueImages(token, selectedImages);
+
+      if (result.success) {
+        Alert.alert(
+          'Success',
+          `${selectedImages.length} image(s) uploaded successfully!`,
+        );
+        await loadVenueImages(); // Refresh images list
+      } else {
+        Alert.alert('Error', result.error || 'Failed to upload images');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      Alert.alert('Error', 'Failed to upload images');
+    } finally {
+      setIsUploadingImages(false);
+    }
+  };
+
+  // Delete image
+  const handleDeleteImage = (imageId, imageIndex) => {
+    Alert.alert('Delete Image', 'Are you sure you want to delete this image?', [
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => deleteImage(imageId, imageIndex),
+      },
+    ]);
+  };
+
+  const deleteImage = async (imageId, imageIndex) => {
+    if (!token) {
+      Alert.alert('Error', 'Authentication required');
+      return;
+    }
+
+    try {
+      const result = await deleteVenueImage(token, imageId);
+
+      if (result.success) {
+        Alert.alert('Success', 'Image deleted successfully!');
+        await loadVenueImages(); // Refresh images list
+        setShowImageGallery(false); // Close gallery if open
+      } else {
+        Alert.alert('Error', result.error || 'Failed to delete image');
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      Alert.alert('Error', 'Failed to delete image');
+    }
+  };
+
+  // Open image gallery modal
+  const openImageGallery = index => {
+    setSelectedImageIndex(index);
+    setShowImageGallery(true);
   };
 
   const handleEditVenue = () => {
@@ -180,6 +600,86 @@ const ProfileScreen = ({ navigation }) => {
     </TouchableOpacity>
   );
 
+  // Image gallery component
+  const renderImageItem = ({ item, index }) => (
+    <TouchableOpacity
+      style={styles.imageItem}
+      onPress={() => openImageGallery(index)}
+    >
+      <Image
+        source={{ uri: `https://easeevent.echogen.online${item.image}` }}
+        style={styles.imageItemPhoto}
+        resizeMode="cover"
+      />
+      <TouchableOpacity
+        style={styles.deleteImageButton}
+        onPress={() => handleDeleteImage(item.id, index)}
+      >
+        <Ionicons name="close-circle" size={24} color={colors.error} />
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+
+  const ImageGallerySection = () => (
+    <View style={styles.imageGallerySection}>
+      <View style={styles.galleryHeader}>
+        <Text style={styles.sectionTitle}>Venue Photos</Text>
+        <View style={styles.galleryButtons}>
+          <TouchableOpacity
+            style={styles.debugButton}
+            onPress={debugPermissions}
+          >
+            <Ionicons name="information-circle" size={16} color={colors.gray} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.addImageButton}
+            onPress={handleSelectImages}
+            disabled={isUploadingImages}
+          >
+            {isUploadingImages ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Ionicons name="camera" size={20} color={colors.primary} />
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {isLoadingImages ? (
+        <View style={styles.loadingImagesContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading images...</Text>
+        </View>
+      ) : venueImages.length > 0 ? (
+        <FlatList
+          data={venueImages}
+          renderItem={renderImageItem}
+          keyExtractor={item => item.id.toString()}
+          numColumns={2}
+          scrollEnabled={false}
+          contentContainerStyle={styles.imageGrid}
+        />
+      ) : (
+        <View style={styles.emptyImageState}>
+          <Ionicons name="image-outline" size={64} color={colors.gray} />
+          <Text style={styles.emptyImageText}>No photos yet</Text>
+          <Text style={styles.emptyImageSubtext}>
+            Add photos to showcase your venue
+          </Text>
+          <TouchableOpacity
+            style={styles.addFirstImageButton}
+            onPress={handleSelectImages}
+            disabled={isUploadingImages}
+          >
+            <Text style={styles.addFirstImageButtonText}>
+              {isUploadingImages ? 'Uploading...' : 'Add Photos'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+
   if (isLoading && !venueDetails) {
     return (
       <SafeAreaView style={[styles.container, getScreenSafeArea(insets)]}>
@@ -217,7 +717,7 @@ const ProfileScreen = ({ navigation }) => {
         >
           <Ionicons name="arrow-back" size={24} color={colors.secondary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profile</Text>
+        <Text style={styles.headerTitle}>Venue Management</Text>
         <TouchableOpacity style={styles.editButton} onPress={handleEditVenue}>
           <Ionicons name="create-outline" size={24} color={colors.primary} />
         </TouchableOpacity>
@@ -255,41 +755,44 @@ const ProfileScreen = ({ navigation }) => {
         </View>
 
         {/* Quick Actions */}
-        {/* <View style={styles.quickActionsSection}>
+        <View style={styles.quickActionsSection}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.quickActionsGrid}>
             <QuickActionCard
+              title="Add Photos"
+              icon="camera-outline"
+              iconColor={colors.primary}
+              onPress={handleSelectImages}
+              description="Upload venue photos"
+            />
+            <QuickActionCard
               title="Edit Details"
               icon="create-outline"
-              iconColor={colors.primary}
+              iconColor={colors.success}
               onPress={handleEditVenue}
               description="Update venue information"
             />
             <QuickActionCard
               title="View Events"
               icon="calendar-outline"
-              iconColor={colors.success}
+              iconColor={colors.warning}
               onPress={() => navigation.navigate('Events')}
               description="Manage your bookings"
             />
             <QuickActionCard
               title="Add Event"
               icon="add-circle-outline"
-              iconColor={colors.warning}
+              iconColor={colors.info}
               onPress={() =>
                 navigation.navigate('EditBooking', { isEdit: false })
               }
               description="Create new booking"
             />
-            <QuickActionCard
-              title="Profile"
-              icon="person-outline"
-              iconColor={colors.info}
-              onPress={() => navigation.navigate('Profile')}
-              description="Account settings"
-            />
           </View>
-        </View> */}
+        </View>
+
+        {/* Image Gallery Section */}
+        <ImageGallerySection />
 
         {/* Venue Information */}
         <InfoCard title="Venue Information" icon="business">
@@ -364,6 +867,84 @@ const ProfileScreen = ({ navigation }) => {
           />
         </InfoCard>
       </ScrollView>
+
+      {/* Image Gallery Modal */}
+      <Modal
+        visible={showImageGallery}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setShowImageGallery(false)}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.galleryModalHeader}>
+            <TouchableOpacity onPress={() => setShowImageGallery(false)}>
+              <Text style={styles.modalCancelText}>Close</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>
+              {selectedImageIndex + 1} of {venueImages.length}
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                if (venueImages[selectedImageIndex]) {
+                  handleDeleteImage(
+                    venueImages[selectedImageIndex].id,
+                    selectedImageIndex,
+                  );
+                }
+              }}
+            >
+              <Ionicons name="trash-outline" size={24} color={colors.error} />
+            </TouchableOpacity>
+          </View>
+
+          {venueImages.length > 0 && venueImages[selectedImageIndex] && (
+            <View style={styles.fullScreenImageContainer}>
+              <Image
+                source={{
+                  uri: `https://easeevent.echogen.online${venueImages[selectedImageIndex].image}`,
+                }}
+                style={styles.fullScreenImage}
+                resizeMode="contain"
+              />
+
+              {/* Navigation arrows */}
+              {venueImages.length > 1 && (
+                <>
+                  {selectedImageIndex > 0 && (
+                    <TouchableOpacity
+                      style={[styles.imageNavButton, styles.prevButton]}
+                      onPress={() =>
+                        setSelectedImageIndex(selectedImageIndex - 1)
+                      }
+                    >
+                      <Ionicons
+                        name="chevron-back"
+                        size={30}
+                        color={colors.background}
+                      />
+                    </TouchableOpacity>
+                  )}
+
+                  {selectedImageIndex < venueImages.length - 1 && (
+                    <TouchableOpacity
+                      style={[styles.imageNavButton, styles.nextButton]}
+                      onPress={() =>
+                        setSelectedImageIndex(selectedImageIndex + 1)
+                      }
+                    >
+                      <Ionicons
+                        name="chevron-forward"
+                        size={30}
+                        color={colors.background}
+                      />
+                    </TouchableOpacity>
+                  )}
+                </>
+              )}
+            </View>
+          )}
+        </SafeAreaView>
+      </Modal>
 
       {/* Edit Modal */}
       <Modal
@@ -671,6 +1252,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    marginBottom: 12,
   },
   quickActionIcon: {
     marginBottom: 8,
@@ -814,6 +1396,124 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     color: colors.secondary,
   },
+
+  // Image Gallery Styles
+  imageGallerySection: {
+    marginBottom: 24,
+  },
+  galleryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  galleryButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  debugButton: {
+    padding: 8,
+    borderRadius: 16,
+    backgroundColor: colors.lightGray,
+  },
+  addImageButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: colors.lightGray,
+  },
+  loadingImagesContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  imageGrid: {
+    gap: 12,
+  },
+  imageItem: {
+    width: (width - 64) / 2, // Account for padding and gap
+    height: (width - 64) / 2,
+    marginBottom: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  imageItemPhoto: {
+    width: '100%',
+    height: '100%',
+  },
+  deleteImageButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: colors.background,
+    borderRadius: 12,
+  },
+  emptyImageState: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyImageText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.secondary,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyImageSubtext: {
+    fontSize: 14,
+    color: colors.gray,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  addFirstImageButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  addFirstImageButtonText: {
+    color: colors.background,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+
+  // Gallery Modal Styles
+  galleryModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  fullScreenImageContainer: {
+    flex: 1,
+    backgroundColor: colors.black,
+    position: 'relative',
+  },
+  fullScreenImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imageNavButton: {
+    position: 'absolute',
+    top: '50%',
+    backgroundColor: colors.primary + '80',
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: -25,
+  },
+  prevButton: {
+    left: 20,
+  },
+  nextButton: {
+    right: 20,
+  },
 });
 
-export default ProfileScreen;
+export default VenueScreen;

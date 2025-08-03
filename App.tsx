@@ -15,6 +15,7 @@ import ResetPasswordScreen from './src/screens/ResetPasswordScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import EventsScreen from './src/screens/EventsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import VenueScreen from './src/screens/VenueScreen';
 import EditBookingScreen from './src/screens/EditBookingScreen';
 import DateTimePickerScreen from './src/screens/DateTimePickerScreen';
 
@@ -96,6 +97,14 @@ const AuthNavigator = () => {
         options={{
           gestureEnabled: true,
           headerShown: false, // Profile has custom header with back button
+        }}
+      />
+      <Stack.Screen
+        name="Venue"
+        component={VenueScreen}
+        options={{
+          gestureEnabled: true,
+          headerShown: false, // Venue has custom header with back button
         }}
       />
       <Stack.Screen

@@ -564,11 +564,11 @@ const HomeScreen = ({ navigation }) => {
 
               <TouchableOpacity
                 style={styles.quickActionCard}
-                onPress={() => setSelectedTab(2)}
+                onPress={() => navigation.navigate('Venue')}
               >
-                <Ionicons name="settings" size={32} color={colors.success} />
+                <Ionicons name="business" size={32} color={colors.success} />
                 <Text style={styles.quickActionText} numberOfLines={2}>
-                  Venue Settings
+                  Venue Management
                 </Text>
               </TouchableOpacity>
 
@@ -639,10 +639,7 @@ const HomeScreen = ({ navigation }) => {
                     navigation.navigate('Profile');
                     break;
                   case 3:
-                    Alert.alert(
-                      'Coming Soon',
-                      'Venue management feature will be available soon.',
-                    );
+                    navigation.navigate('Venue');
                     break;
                   case 4:
                     Alert.alert(

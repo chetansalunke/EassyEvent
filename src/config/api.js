@@ -2,15 +2,16 @@
 
 // Determine API base URL based on environment
 const API_BASE_URL = __DEV__
-  ? 'http://10.0.2.2:5000/api' // Development - Android emulator localhost (port 5000)
-  : 'https://your-production-api.herokuapp.com/api'; // Production - replace with your deployed URL
+  ? 'https://easeevent.echogen.online' // Use your production API for now
+  : 'https://easeevent.echogen.online'; // Production
 
 // Alternative URLs for development testing
 export const DEV_URLS = {
-  LOCALHOST: 'http://localhost:5000/api',
-  ANDROID_EMULATOR: 'http://10.0.2.2:5000/api',
-  IOS_SIMULATOR: 'http://localhost:5000/api',
-  YOUR_LOCAL_IP: 'http://192.168.1.100:5000/api', // Replace with your actual IP
+  LOCALHOST: 'http://localhost:8000',
+  ANDROID_EMULATOR: 'http://10.0.2.2:8000',
+  IOS_SIMULATOR: 'http://localhost:8000',
+  YOUR_LOCAL_IP: 'http://192.168.1.100:8000', // Replace with your actual IP
+  PRODUCTION: 'https://easeevent.echogen.online',
 };
 
 export const API_ENDPOINTS = {
@@ -33,6 +34,11 @@ export const API_ENDPOINTS = {
   GET_PROFILE: `${API_BASE_URL}/auth/me`,
   UPDATE_PROFILE: `${API_BASE_URL}/auth/update-profile`,
   DELETE_ACCOUNT: `${API_BASE_URL}/auth/delete-account`,
+
+  // Venue images
+  VENUE_IMAGES_UPLOAD: `${API_BASE_URL}/venue/images/post/`,
+  VENUE_IMAGES_LIST: `${API_BASE_URL}/venue/images/list/`,
+  VENUE_IMAGES_DELETE: `${API_BASE_URL}/venue/images/delete/`, // + {id}/
 };
 
 export const API_CONFIG = {
