@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,57 +10,187 @@ import {
   ActivityIndicator,
   RefreshControl,
   FlatList,
+  TextInput,
+  Modal,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { colors } from '../utils/colors';
 import { useAuth } from '../context/AuthContext';
-import { getAllEvents, deleteEvent } from '../utils/authUtils';
+import { deleteEvent } from '../utils/authUtils';
+import axios from 'axios';
+import { Calendar } from 'react-native-calendars';
 import { PAYMENT_STATUS_OPTIONS } from '../services/eventsApi';
 
 const EventsScreen = ({ navigation }) => {
-  const insets = useSafeAreaInsets();
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [events, setEvents] = useState([]);
+  const [markedDates, setMarkedDates] = useState({});
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [selectedDateEvents, setSelectedDateEvents] = useState([]);
+  const [showFilters, setShowFilters] = useState(false);
+  const [showEventDetail, setShowEventDetail] = useState(false);
+  const [currentView, setCurrentView] = useState('calendar'); // 'calendar' or 'list'
+  const [filters, setFilters] = useState({
+    search: '',
+    fromDate: '2025-01-01',
+    toDate: '2025-12-31',
+    limit: 50,
+  });
   const { token } = useAuth();
+
+  // Debug token state
+  useEffect(() => {
+    console.log('EventsScreen - Token state:', {
+      tokenExists: !!token,
+      tokenLength: token ? token.length : 0,
+      tokenPreview: token ? `${token.substring(0, 10)}...` : 'No token',
+    });
+  }, [token]);
 
   // Load events on component mount
   useEffect(() => {
-    loadEvents();
-  }, []);
+    fetchEventsFromApi();
+  }, [fetchEventsFromApi]);
+
+  // Reload events when filters change
+  useEffect(() => {
+    if (token) {
+      const timeoutId = setTimeout(() => {
+        fetchEventsFromApi();
+      }, 300); // Debounce API calls
+      return () => clearTimeout(timeoutId);
+    }
+  }, [filters, token, fetchEventsFromApi]);
 
   // Focus listener to reload events when returning to screen
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      loadEvents();
+      fetchEventsFromApi();
     });
-
     return unsubscribe;
-  }, [navigation]);
+  }, [navigation, fetchEventsFromApi]);
 
-  const loadEvents = async () => {
-    if (!token) return;
+  // Fetch events from the provided API endpoint
+  const fetchEventsFromApi = useCallback(async () => {
+    if (!token) {
+      console.log('No token available, skipping API call');
+      setIsLoading(false);
+      return;
+    }
 
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      const result = await getAllEvents(token);
+      const queryParams = new URLSearchParams({
+        search: filters.search,
+        ordering: 'from_date',
+        limit: filters.limit.toString(),
+        offset: '0',
+        from_date__gte: filters.fromDate,
+        from_date__lte: filters.toDate,
+      });
 
-      if (result.success) {
-        setEvents(result.data || []);
+      console.log('Token:', token ? 'Present' : 'Missing');
+      console.log('Token length:', token ? token.length : 0);
+      console.log(
+        'Fetching events with URL:',
+        `https://easeevent.echogen.online/events/list/?${queryParams}`,
+      );
+
+      const response = await axios.get(
+        `https://easeevent.echogen.online/events/list/?${queryParams}`,
+        {
+          headers: {
+            Authorization: `Token ${token}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+
+      console.log('API Response:', response.data);
+
+      if (response.data && response.data.results) {
+        setEvents(response.data.results);
+        // Mark booking dates on calendar
+        const marks = {};
+        const dateEventMap = {};
+
+        response.data.results.forEach(event => {
+          let current = new Date(event.from_date);
+          const end = new Date(event.to_date);
+
+          while (current <= end) {
+            const dateStr = current.toISOString().split('T')[0];
+
+            // Track events per date
+            if (!dateEventMap[dateStr]) {
+              dateEventMap[dateStr] = [];
+            }
+            dateEventMap[dateStr].push(event);
+
+            // Mark date on calendar
+            marks[dateStr] = {
+              marked: true,
+              dotColor: '#2196F3',
+              customStyles: {
+                container: {
+                  backgroundColor: '#e3f2fd',
+                  borderRadius: 8,
+                },
+                text: {
+                  color: '#1565c0',
+                  fontWeight: 'bold',
+                },
+              },
+            };
+            current.setDate(current.getDate() + 1);
+          }
+        });
+
+        setMarkedDates(marks);
+        // Store the date-event mapping for quick lookup
+        setEvents(response.data.results);
       } else {
-        Alert.alert('Error', result.error || 'Failed to load events');
+        setEvents([]);
+        setMarkedDates({});
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to load events');
+      console.error('API Error:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+
+      if (error.response?.status === 401) {
+        Alert.alert(
+          'Authentication Error',
+          'Your session has expired. Please log in again.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Navigate to login screen or clear auth state
+                navigation.navigate('Login');
+              },
+            },
+          ],
+        );
+      } else {
+        Alert.alert(
+          'Error',
+          'Failed to load events: ' +
+            (error.response?.data?.detail || error.message),
+        );
+      }
+      setEvents([]);
+      setMarkedDates({});
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [token, filters, navigation]);
 
   const onRefresh = async () => {
     setIsRefreshing(true);
-    await loadEvents();
+    await fetchEventsFromApi();
     setIsRefreshing(false);
   };
 
@@ -88,7 +218,7 @@ const EventsScreen = ({ navigation }) => {
               const result = await deleteEvent(token, event.id);
               if (result.success) {
                 Alert.alert('Success', 'Event deleted successfully');
-                loadEvents(); // Reload events
+                fetchEventsFromApi(); // Reload events
               } else {
                 Alert.alert('Error', result.error || 'Failed to delete event');
               }
@@ -136,6 +266,46 @@ const EventsScreen = ({ navigation }) => {
     return timeString.substring(0, 5); // Remove seconds
   };
 
+  // Calendar date select handler
+  const handleDayPress = day => {
+    setSelectedDate(day.dateString);
+    // Find all events for this date
+    const eventsForDate = events.filter(event => {
+      const start = new Date(event.from_date);
+      const end = new Date(event.to_date);
+      const selected = new Date(day.dateString);
+      return selected >= start && selected <= end;
+    });
+
+    setSelectedDateEvents(eventsForDate);
+    setSelectedEvent(eventsForDate.length > 0 ? eventsForDate[0] : null);
+  };
+
+  const handleEventPress = event => {
+    setSelectedEvent(event);
+    setShowEventDetail(true);
+  };
+
+  const handleViewToggle = () => {
+    setCurrentView(currentView === 'calendar' ? 'list' : 'calendar');
+  };
+
+  const applyFilters = () => {
+    setShowFilters(false);
+    fetchEventsFromApi();
+  };
+
+  const resetFilters = () => {
+    setFilters({
+      search: '',
+      fromDate: '2025-01-01',
+      toDate: '2025-12-31',
+      limit: 50,
+    });
+    setShowFilters(false);
+    fetchEventsFromApi();
+  };
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -146,19 +316,33 @@ const EventsScreen = ({ navigation }) => {
           >
             <Ionicons name="arrow-back" size={24} color={colors.secondary} />
           </TouchableOpacity>
-
           <View style={styles.headerContent}>
             <Text style={styles.headerTitle}>Events</Text>
             <Text style={styles.headerSubtitle}>
               Manage your venue bookings
             </Text>
           </View>
-
           <TouchableOpacity
             style={styles.addButton}
             onPress={() => navigation.navigate('EditBooking')}
           >
             <Ionicons name="add" size={24} color={colors.background} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.filterButton}
+            onPress={() => setShowFilters(true)}
+          >
+            <Ionicons name="filter" size={20} color={colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.viewToggleButton}
+            onPress={handleViewToggle}
+          >
+            <Ionicons
+              name={currentView === 'calendar' ? 'list' : 'calendar'}
+              size={20}
+              color={colors.primary}
+            />
           </TouchableOpacity>
         </View>
         <View style={styles.loadingContainer}>
@@ -178,125 +362,227 @@ const EventsScreen = ({ navigation }) => {
         >
           <Ionicons name="arrow-back" size={24} color={colors.secondary} />
         </TouchableOpacity>
-
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>Events</Text>
           <Text style={styles.headerSubtitle}>Manage your venue bookings</Text>
         </View>
-
         <TouchableOpacity
           style={styles.addButton}
           onPress={() => navigation.navigate('EditBooking')}
         >
           <Ionicons name="add" size={24} color={colors.background} />
         </TouchableOpacity>
-      </View>
-
-      <ScrollView
-        style={styles.content}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={onRefresh}
-            colors={[colors.primary]}
-            tintColor={colors.primary}
+        <TouchableOpacity
+          style={styles.filterButton}
+          onPress={() => setShowFilters(true)}
+        >
+          <Ionicons name="filter" size={20} color={colors.primary} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.viewToggleButton}
+          onPress={handleViewToggle}
+        >
+          <Ionicons
+            name={currentView === 'calendar' ? 'list' : 'calendar'}
+            size={20}
+            color={colors.primary}
           />
-        }
-      >
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>Loading events...</Text>
+        </TouchableOpacity>
+      </View>
+      {currentView === 'calendar' ? (
+        <ScrollView
+          style={styles.content}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={onRefresh}
+              colors={[colors.primary]}
+              tintColor={colors.primary}
+            />
+          }
+        >
+          <Calendar
+            style={{ borderRadius: 12, marginBottom: 16 }}
+            markingType={'custom'}
+            markedDates={{
+              ...markedDates,
+              ...(selectedDate
+                ? {
+                    [selectedDate]: {
+                      ...(markedDates[selectedDate] || {}),
+                      selected: true,
+                      selectedColor: colors.primary,
+                    },
+                  }
+                : {}),
+            }}
+            onDayPress={handleDayPress}
+            theme={{
+              backgroundColor: colors.background,
+              calendarBackground: colors.background,
+              textSectionTitleColor: colors.secondary,
+              selectedDayBackgroundColor: colors.primary,
+              selectedDayTextColor: colors.background,
+              todayTextColor: colors.primary,
+              dayTextColor: colors.secondary,
+              textDisabledColor: colors.gray,
+              dotColor: colors.primary,
+              arrowColor: colors.primary,
+              monthTextColor: colors.secondary,
+              indicatorColor: colors.primary,
+            }}
+          />
+          {/* Show event details for selected date */}
+          {selectedDateEvents.length > 0 ? (
+            <View>
+              <Text style={styles.selectedDateTitle}>
+                Events on {formatDate(selectedDate)} (
+                {selectedDateEvents.length})
+              </Text>
+              {selectedDateEvents.map(event => (
+                <TouchableOpacity
+                  key={event.id}
+                  style={styles.eventCard}
+                  onPress={() => handleEventPress(event)}
+                >
+                  <View style={styles.eventHeader}>
+                    <Text style={styles.eventName} numberOfLines={2}>
+                      {event.name}
+                    </Text>
+                    <View style={styles.eventActions}>
+                      <TouchableOpacity
+                        style={styles.actionButton}
+                        onPress={() => handleEditEvent(event)}
+                      >
+                        <Ionicons
+                          name="pencil"
+                          size={20}
+                          color={colors.primary}
+                        />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.actionButton}
+                        onPress={() => handleDeleteEvent(event)}
+                      >
+                        <Ionicons name="trash" size={20} color={colors.error} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  <View style={styles.eventSummary}>
+                    <Text style={styles.eventSummaryText}>
+                      {formatDate(event.from_date)} -{' '}
+                      {formatDate(event.to_date)}
+                    </Text>
+                    <Text style={styles.eventSummaryText}>
+                      {event.number_of_people || 0} people • ₹
+                      {(event.amount_received || 0).toLocaleString()}
+                    </Text>
+                  </View>
+                  <View style={styles.eventFooter}>
+                    <View
+                      style={[
+                        styles.paymentStatusBadge,
+                        {
+                          backgroundColor:
+                            getPaymentStatusColor(event.payment_status) + '20',
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.paymentStatusText,
+                          {
+                            color: getPaymentStatusColor(event.payment_status),
+                          },
+                        ]}
+                      >
+                        {getPaymentStatusLabel(event.payment_status)}
+                      </Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="calendar-outline" size={64} color={colors.gray} />
+              <Text style={styles.emptyTitle}>
+                {selectedDate ? 'No events on this date' : 'Select a date'}
+              </Text>
+              <Text style={styles.emptySubtitle}>
+                {selectedDate
+                  ? 'There are no bookings scheduled for this date'
+                  : 'Tap a highlighted date to view event details'}
+              </Text>
+            </View>
+          )}
+        </ScrollView>
+      ) : (
+        // List View - Use FlatList directly without ScrollView wrapper
+        <View style={styles.listView}>
+          <View style={styles.listHeader}>
+            <Text style={styles.listTitle}>All Events ({events.length})</Text>
           </View>
-        ) : events.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="calendar-outline" size={64} color={colors.gray} />
-            <Text style={styles.emptyTitle}>No Events Yet</Text>
-            <Text style={styles.emptySubtitle}>
-              Start by adding your first event booking
-            </Text>
-            <TouchableOpacity
-              style={styles.emptyButton}
-              onPress={() => navigation.navigate('EditBooking')}
-            >
-              <Text style={styles.emptyButtonText}>Add Event</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
           <FlatList
             data={events}
             keyExtractor={item => item.id.toString()}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.listContent}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={onRefresh}
+                colors={[colors.primary]}
+                tintColor={colors.primary}
+              />
+            }
             renderItem={({ item: event }) => (
               <TouchableOpacity
-                style={styles.eventCard}
-                onPress={() =>
-                  navigation.navigate('EditBooking', {
-                    isEdit: true,
-                    eventId: event.id,
-                    event,
-                  })
-                }
+                style={styles.eventListCard}
+                onPress={() => handleEventPress(event)}
               >
                 <View style={styles.eventHeader}>
-                  <Text style={styles.eventName} numberOfLines={2}>
+                  <Text style={styles.eventName} numberOfLines={1}>
                     {event.name}
                   </Text>
                   <View style={styles.eventActions}>
                     <TouchableOpacity
                       style={styles.actionButton}
-                      onPress={e => {
-                        e.stopPropagation();
-                        handleEditEvent(event);
-                      }}
+                      onPress={() => handleEditEvent(event)}
                     >
                       <Ionicons
                         name="pencil"
-                        size={20}
+                        size={18}
                         color={colors.primary}
                       />
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.actionButton}
-                      onPress={e => {
-                        e.stopPropagation();
-                        handleDeleteEvent(event);
-                      }}
+                      onPress={() => handleDeleteEvent(event)}
                     >
-                      <Ionicons name="trash" size={20} color={colors.error} />
+                      <Ionicons name="trash" size={18} color={colors.error} />
                     </TouchableOpacity>
                   </View>
                 </View>
 
-                <View style={styles.eventDetails}>
-                  <View style={styles.eventDetailRow}>
-                    <Ionicons name="calendar" size={16} color={colors.gray} />
-                    <Text style={styles.eventDetailText}>
-                      {formatDate(event.from_date)} at{' '}
-                      {formatTime(event.from_time)}
+                <View style={styles.eventListDetails}>
+                  <View style={styles.eventListRow}>
+                    <Ionicons name="calendar" size={14} color={colors.gray} />
+                    <Text style={styles.eventListText}>
+                      {formatDate(event.from_date)} -{' '}
+                      {formatDate(event.to_date)}
                     </Text>
                   </View>
-
-                  <View style={styles.eventDetailRow}>
-                    <Ionicons name="time" size={16} color={colors.gray} />
-                    <Text style={styles.eventDetailText}>
-                      Until {formatDate(event.to_date)} at{' '}
-                      {formatTime(event.to_time)}
-                    </Text>
-                  </View>
-
-                  <View style={styles.eventDetailRow}>
-                    <Ionicons name="people" size={16} color={colors.gray} />
-                    <Text style={styles.eventDetailText}>
+                  <View style={styles.eventListRow}>
+                    <Ionicons name="people" size={14} color={colors.gray} />
+                    <Text style={styles.eventListText}>
                       {event.number_of_people || 0} people
                     </Text>
                   </View>
-
-                  <View style={styles.eventDetailRow}>
-                    <Ionicons name="cash" size={16} color={colors.gray} />
-                    <Text style={styles.eventDetailText}>
-                      ₹{(event.amount_received || 0).toLocaleString()} received
-                      {event.amount_pending > 0 &&
-                        `, ₹${event.amount_pending.toLocaleString()} pending`}
+                  <View style={styles.eventListRow}>
+                    <Ionicons name="cash" size={14} color={colors.gray} />
+                    <Text style={styles.eventListText}>
+                      ₹{(event.amount_received || 0).toLocaleString()}
                     </Text>
                   </View>
                 </View>
@@ -314,20 +600,276 @@ const EventsScreen = ({ navigation }) => {
                     <Text
                       style={[
                         styles.paymentStatusText,
-                        { color: getPaymentStatusColor(event.payment_status) },
+                        {
+                          color: getPaymentStatusColor(event.payment_status),
+                        },
                       ]}
                     >
                       {getPaymentStatusLabel(event.payment_status)}
                     </Text>
                   </View>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={16}
+                    color={colors.gray}
+                  />
                 </View>
               </TouchableOpacity>
             )}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.listContent}
+            ListEmptyComponent={() => (
+              <View style={styles.emptyState}>
+                <Ionicons name="list-outline" size={64} color={colors.gray} />
+                <Text style={styles.emptyTitle}>No events found</Text>
+                <Text style={styles.emptySubtitle}>
+                  Try adjusting your filters or create a new event
+                </Text>
+              </View>
+            )}
           />
-        )}
-      </ScrollView>
+        </View>
+      )}
+
+      {/* Event Detail Modal */}
+      <Modal
+        visible={showEventDetail}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowEventDetail(false)}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowEventDetail(false)}>
+              <Text style={styles.modalCancelText}>Close</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Event Details</Text>
+            <TouchableOpacity
+              onPress={() => {
+                setShowEventDetail(false);
+                if (selectedEvent) {
+                  handleEditEvent(selectedEvent);
+                }
+              }}
+            >
+              <Text style={styles.modalApplyText}>Edit</Text>
+            </TouchableOpacity>
+          </View>
+
+          {selectedEvent && (
+            <ScrollView style={styles.modalContent}>
+              <View style={styles.detailSection}>
+                <Text style={styles.detailEventName}>{selectedEvent.name}</Text>
+
+                <View style={styles.detailRow}>
+                  <Ionicons name="calendar" size={20} color={colors.primary} />
+                  <View style={styles.detailTextContainer}>
+                    <Text style={styles.detailLabel}>Date & Time</Text>
+                    <Text style={styles.detailValue}>
+                      From: {formatDate(selectedEvent.from_date)} at{' '}
+                      {formatTime(selectedEvent.from_time)}
+                    </Text>
+                    <Text style={styles.detailValue}>
+                      To: {formatDate(selectedEvent.to_date)} at{' '}
+                      {formatTime(selectedEvent.to_time)}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.detailRow}>
+                  <Ionicons name="people" size={20} color={colors.primary} />
+                  <View style={styles.detailTextContainer}>
+                    <Text style={styles.detailLabel}>Number of People</Text>
+                    <Text style={styles.detailValue}>
+                      {selectedEvent.number_of_people || 0} guests
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.detailRow}>
+                  <Ionicons name="cash" size={20} color={colors.primary} />
+                  <View style={styles.detailTextContainer}>
+                    <Text style={styles.detailLabel}>Payment Information</Text>
+                    <Text style={styles.detailValue}>
+                      Amount Received: ₹
+                      {(selectedEvent.amount_received || 0).toLocaleString()}
+                    </Text>
+                    {selectedEvent.amount_pending > 0 && (
+                      <Text
+                        style={[styles.detailValue, { color: colors.warning }]}
+                      >
+                        Amount Pending: ₹
+                        {selectedEvent.amount_pending.toLocaleString()}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+
+                <View style={styles.detailRow}>
+                  <Ionicons name="card" size={20} color={colors.primary} />
+                  <View style={styles.detailTextContainer}>
+                    <Text style={styles.detailLabel}>Payment Status</Text>
+                    <View
+                      style={[
+                        styles.paymentStatusBadge,
+                        styles.detailStatusBadge,
+                        {
+                          backgroundColor:
+                            getPaymentStatusColor(
+                              selectedEvent.payment_status,
+                            ) + '20',
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.paymentStatusText,
+                          styles.detailStatusText,
+                          {
+                            color: getPaymentStatusColor(
+                              selectedEvent.payment_status,
+                            ),
+                          },
+                        ]}
+                      >
+                        {getPaymentStatusLabel(selectedEvent.payment_status)}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.detailRow}>
+                  <Ionicons name="time" size={20} color={colors.primary} />
+                  <View style={styles.detailTextContainer}>
+                    <Text style={styles.detailLabel}>Created</Text>
+                    <Text style={styles.detailValue}>
+                      {new Date(selectedEvent.created_at).toLocaleDateString(
+                        'en-US',
+                        {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        },
+                      )}
+                    </Text>
+                  </View>
+                </View>
+
+                {selectedEvent.description && (
+                  <View style={styles.detailRow}>
+                    <Ionicons
+                      name="document-text"
+                      size={20}
+                      color={colors.primary}
+                    />
+                    <View style={styles.detailTextContainer}>
+                      <Text style={styles.detailLabel}>Description</Text>
+                      <Text style={styles.detailValue}>
+                        {selectedEvent.description}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              <View style={styles.detailActions}>
+                <TouchableOpacity
+                  style={[styles.detailActionButton, styles.editButton]}
+                  onPress={() => {
+                    setShowEventDetail(false);
+                    handleEditEvent(selectedEvent);
+                  }}
+                >
+                  <Ionicons name="pencil" size={20} color={colors.background} />
+                  <Text style={styles.detailActionText}>Edit Event</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.detailActionButton, styles.deleteButton]}
+                  onPress={() => {
+                    setShowEventDetail(false);
+                    handleDeleteEvent(selectedEvent);
+                  }}
+                >
+                  <Ionicons name="trash" size={20} color={colors.background} />
+                  <Text style={styles.detailActionText}>Delete Event</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          )}
+        </SafeAreaView>
+      </Modal>
+
+      {/* Filter Modal */}
+      <Modal
+        visible={showFilters}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowFilters(false)}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowFilters(false)}>
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Filter Events</Text>
+            <TouchableOpacity onPress={applyFilters}>
+              <Text style={styles.modalApplyText}>Apply</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalContent}>
+            <View style={styles.filterSection}>
+              <Text style={styles.filterLabel}>Search</Text>
+              <TextInput
+                style={styles.filterInput}
+                placeholder="Search events by name..."
+                value={filters.search}
+                onChangeText={text => setFilters({ ...filters, search: text })}
+              />
+            </View>
+
+            <View style={styles.filterSection}>
+              <Text style={styles.filterLabel}>From Date</Text>
+              <TextInput
+                style={styles.filterInput}
+                placeholder="YYYY-MM-DD"
+                value={filters.fromDate}
+                onChangeText={text =>
+                  setFilters({ ...filters, fromDate: text })
+                }
+              />
+            </View>
+
+            <View style={styles.filterSection}>
+              <Text style={styles.filterLabel}>To Date</Text>
+              <TextInput
+                style={styles.filterInput}
+                placeholder="YYYY-MM-DD"
+                value={filters.toDate}
+                onChangeText={text => setFilters({ ...filters, toDate: text })}
+              />
+            </View>
+
+            <View style={styles.filterSection}>
+              <Text style={styles.filterLabel}>Limit</Text>
+              <TextInput
+                style={styles.filterInput}
+                placeholder="Number of events to fetch"
+                value={filters.limit.toString()}
+                keyboardType="numeric"
+                onChangeText={text =>
+                  setFilters({ ...filters, limit: parseInt(text) || 50 })
+                }
+              />
+            </View>
+
+            <TouchableOpacity style={styles.resetButton} onPress={resetFilters}>
+              <Text style={styles.resetButtonText}>Reset Filters</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -484,6 +1026,215 @@ const styles = StyleSheet.create({
   },
   paymentStatusText: {
     fontSize: 12,
+    fontWeight: '600',
+  },
+  selectedDateTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.secondary,
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  filterButton: {
+    width: 40,
+    height: 40,
+    backgroundColor: colors.background,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.secondary,
+  },
+  modalCancelText: {
+    fontSize: 16,
+    color: colors.gray,
+  },
+  modalApplyText: {
+    fontSize: 16,
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  modalContent: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  filterSection: {
+    marginBottom: 20,
+  },
+  filterLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.secondary,
+    marginBottom: 8,
+  },
+  filterInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    color: colors.secondary,
+    backgroundColor: colors.background,
+  },
+  resetButton: {
+    backgroundColor: colors.lightGray,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  resetButtonText: {
+    fontSize: 16,
+    color: colors.secondary,
+    fontWeight: '600',
+  },
+  viewToggleButton: {
+    width: 40,
+    height: 40,
+    backgroundColor: colors.background,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  listView: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+  },
+  listHeader: {
+    paddingBottom: 16,
+  },
+  listTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.secondary,
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
+  eventListCard: {
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  eventListDetails: {
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  eventListRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  eventListText: {
+    fontSize: 13,
+    color: colors.secondary,
+    marginLeft: 6,
+  },
+  eventSummary: {
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  eventSummaryText: {
+    fontSize: 13,
+    color: colors.gray,
+    marginBottom: 2,
+  },
+  detailSection: {
+    paddingBottom: 20,
+  },
+  detailEventName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.secondary,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+    paddingHorizontal: 4,
+  },
+  detailTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  detailLabel: {
+    fontSize: 14,
+    color: colors.gray,
+    marginBottom: 4,
+    fontWeight: '500',
+  },
+  detailValue: {
+    fontSize: 16,
+    color: colors.secondary,
+    lineHeight: 20,
+  },
+  detailStatusBadge: {
+    alignSelf: 'flex-start',
+    marginTop: 2,
+  },
+  detailStatusText: {
+    fontSize: 14,
+  },
+  detailActions: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    marginTop: 20,
+  },
+  detailActionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  editButton: {
+    backgroundColor: colors.primary,
+  },
+  deleteButton: {
+    backgroundColor: colors.error,
+  },
+  detailActionText: {
+    color: colors.background,
+    fontSize: 16,
     fontWeight: '600',
   },
 });

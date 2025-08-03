@@ -362,7 +362,7 @@ const SignUpScreen = ({ navigation }) => {
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Name</Text>
+            <Text style={styles.inputLabel}>Venue Name</Text>
             <TextInput
               style={[styles.input, errors.name && styles.inputError]}
               value={formData.name}

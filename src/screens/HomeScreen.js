@@ -20,6 +20,10 @@ import { colors } from '../utils/colors';
 import { useAuth } from '../context/AuthContext';
 import { getEventStatistics, getVenueDetails } from '../utils/authUtils';
 
+// Import axios or fetch for direct API call if not already in utils
+import axios from 'axios';
+import { API_BASE_URL } from '../config/apiConfig';
+
 const { width, height } = Dimensions.get('window');
 
 // Device size detection for adaptive UI
@@ -38,11 +42,54 @@ const HomeScreen = ({ navigation }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [dashboardStats, setDashboardStats] = useState(null);
   const [venueDetails, setVenueDetails] = useState(null);
+  const [bookingStats, setBookingStats] = useState(null); // New state for booking stats
+  const [eventDetails, setEventDetails] = useState(null); // State for event details
+  // Fetch event details from API (for event id 1)
+  const fetchEventDetails = async () => {
+    if (!token) return;
+    try {
+      const response = await axios.get(
+        'https://easeevent.echogen.online/events/get/1',
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      if (response.data) {
+        setEventDetails(response.data);
+      }
+    } catch (error) {
+      console.warn(
+        'Failed to fetch event details:',
+        error?.response?.data || error.message,
+      );
+    }
+  };
   const { user, logout, isAuthenticated, token } = useAuth();
   // Print token once on mount for debugging
   useEffect(() => {
     console.log('Auth token:', token);
   }, [token]);
+
+  // Fetch booking stats from API (updated to use provided endpoint)
+  const fetchBookingStats = async () => {
+    if (!token) return;
+    try {
+      const response = await axios.get(
+        'https://easeevent.echogen.online/events/stats/get/',
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      if (response.data) {
+        setBookingStats(response.data);
+      }
+    } catch (error) {
+      console.warn(
+        'Failed to fetch booking stats:',
+        error?.response?.data || error.message,
+      );
+    }
+  };
   // Auth protection - redirect to login if not authenticated
   useEffect(() => {
     if (!isAuthenticated) {
@@ -113,13 +160,19 @@ const HomeScreen = ({ navigation }) => {
   useEffect(() => {
     if (isAuthenticated && token) {
       loadDashboardData();
+      fetchBookingStats();
+      fetchEventDetails();
     }
   }, [isAuthenticated, token]);
 
   // Refresh data
   const onRefresh = async () => {
     setIsRefreshing(true);
-    await loadDashboardData();
+    await Promise.all([
+      loadDashboardData(),
+      fetchBookingStats(),
+      fetchEventDetails(),
+    ]);
     setIsRefreshing(false);
   };
 
@@ -388,7 +441,6 @@ const HomeScreen = ({ navigation }) => {
               </View>
             </View>
           )}
-
           {/* Statistics Cards */}
           <View style={styles.statsContainer}>
             {getStatsConfig().map((stat, index) => (
@@ -418,7 +470,80 @@ const HomeScreen = ({ navigation }) => {
               </View>
             ))}
           </View>
-
+          {/* Booking Stats Section */}
+          {bookingStats && (
+            <View style={styles.bookingStatsSection}>
+              <Text style={styles.sectionTitle}>Booking Stats</Text>
+              <View style={styles.bookingStatsGrid}>
+                <View style={styles.bookingStatCard}>
+                  <Text style={styles.bookingStatLabel}>
+                    Bookings This Month
+                  </Text>
+                  <Text style={styles.bookingStatValue}>
+                    {bookingStats.bookings_this_month ?? '--'}
+                  </Text>
+                </View>
+                <View style={styles.bookingStatCard}>
+                  <Text style={styles.bookingStatLabel}>
+                    Fully Paid Bookings
+                  </Text>
+                  <Text style={styles.bookingStatValue}>
+                    {bookingStats.fully_paid_bookings ?? '--'}
+                  </Text>
+                </View>
+                <View style={styles.bookingStatCard}>
+                  <Text style={styles.bookingStatLabel}>
+                    Partially Paid Bookings
+                  </Text>
+                  <Text style={styles.bookingStatValue}>
+                    {bookingStats.partially_paid_bookings ?? '--'}
+                  </Text>
+                </View>
+                <View style={styles.bookingStatCard}>
+                  <Text style={styles.bookingStatLabel}>
+                    Available Dates Left
+                  </Text>
+                  <Text style={styles.bookingStatValue}>
+                    {bookingStats.available_dates_left ?? '--'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
+          {/* Event Details Section */}
+          {eventDetails && (
+            <View style={styles.eventDetailsSection}>
+              <Text style={styles.sectionTitle}>Event Details</Text>
+              <View style={styles.eventDetailsGrid}>
+                <Text style={styles.eventDetailLabel}>Name:</Text>
+                <Text style={styles.eventDetailValue}>{eventDetails.name}</Text>
+                <Text style={styles.eventDetailLabel}>From:</Text>
+                <Text style={styles.eventDetailValue}>
+                  {eventDetails.from_date} {eventDetails.from_time}
+                </Text>
+                <Text style={styles.eventDetailLabel}>To:</Text>
+                <Text style={styles.eventDetailValue}>
+                  {eventDetails.to_date} {eventDetails.to_time}
+                </Text>
+                <Text style={styles.eventDetailLabel}>Payment Status:</Text>
+                <Text style={styles.eventDetailValue}>
+                  {eventDetails.payment_status}
+                </Text>
+                <Text style={styles.eventDetailLabel}>People:</Text>
+                <Text style={styles.eventDetailValue}>
+                  {eventDetails.number_of_people}
+                </Text>
+                <Text style={styles.eventDetailLabel}>Amount Received:</Text>
+                <Text style={styles.eventDetailValue}>
+                  ₹{eventDetails.amount_received}
+                </Text>
+                <Text style={styles.eventDetailLabel}>Amount Pending:</Text>
+                <Text style={styles.eventDetailValue}>
+                  ₹{eventDetails.amount_pending}
+                </Text>
+              </View>
+            </View>
+          )}
           {/* Quick Actions */}
           <View style={styles.quickActionsSection}>
             <Text style={styles.sectionTitle}>Quick Actions</Text>
@@ -468,6 +593,7 @@ const HomeScreen = ({ navigation }) => {
               </TouchableOpacity>
             </View>
           </View>
+          // (Booking stats styles moved into StyleSheet.create below)
         </ScrollView>
 
         {/* Device-Adaptive Bottom Navigation */}
@@ -559,6 +685,85 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  // Booking Stats Styles
+  bookingStatsSection: {
+    marginBottom: 20,
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  bookingStatsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  bookingStatCard: {
+    width: '48%',
+    backgroundColor: colors.lightGray,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  bookingStatLabel: {
+    fontSize: 13,
+    color: colors.secondary,
+    marginBottom: 4,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+
+  bookingStatValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.primary,
+    textAlign: 'center',
+  },
+
+  // Event details styles
+  eventDetailsSection: {
+    marginBottom: 20,
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  eventDetailsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  eventDetailLabel: {
+    width: '48%',
+    fontSize: 13,
+    color: colors.secondary,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  eventDetailValue: {
+    width: '48%',
+    fontSize: 13,
+    color: colors.primary,
+    marginBottom: 4,
+    textAlign: 'right',
   },
 
   // Adaptive Header Styles
