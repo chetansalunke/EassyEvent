@@ -35,6 +35,7 @@ import { useAuth } from '../context/AuthContext';
 import { getVenueDetails, updateVenueDetails } from '../utils/authUtils';
 import {
   uploadVenueImages,
+  uploadVenueImagesSimple,
   getVenueImages,
   deleteVenueImage,
 } from '../services/venueImagesApi';
@@ -104,13 +105,20 @@ const VenueScreen = ({ navigation }) => {
       setIsLoadingImages(true);
       const result = await getVenueImages(token);
 
+      console.log('Load venue images result:', result);
+
       if (result.success) {
-        setVenueImages(result.data);
+        console.log('Venue images data:', result.data);
+        console.log('Number of images:', result.data?.length || 0);
+        setVenueImages(result.data || []);
       } else {
         console.warn('Failed to load venue images:', result.error);
+        // Show user-friendly error
+        Alert.alert('Error', 'Failed to load venue images: ' + result.error);
       }
     } catch (error) {
       console.error('Error loading venue images:', error);
+      Alert.alert('Error', 'Failed to load venue images');
     } finally {
       setIsLoadingImages(false);
     }
@@ -269,18 +277,25 @@ const VenueScreen = ({ navigation }) => {
 
     const options = {
       mediaType: 'photo',
-      quality: 0.8,
+      quality: 0.7, // Reduced quality for smaller file size
+      maxWidth: 1024, // Limit image width
+      maxHeight: 1024, // Limit image height
       includeBase64: false,
     };
 
     launchCamera(options, response => {
+      console.log('Camera response:', response);
+
       if (response.didCancel) {
         console.log('User cancelled camera');
       } else if (response.error) {
         console.log('Camera Error: ', response.error);
-        Alert.alert('Error', 'Failed to take photo');
+        Alert.alert('Error', 'Failed to take photo: ' + response.error);
       } else if (response.assets && response.assets.length > 0) {
+        console.log('Camera captured image:', response.assets[0]);
         uploadImages(response.assets);
+      } else {
+        Alert.alert('Error', 'No image captured');
       }
     });
   };
@@ -298,19 +313,26 @@ const VenueScreen = ({ navigation }) => {
 
     const options = {
       mediaType: 'photo',
-      quality: 0.8,
-      selectionLimit: 5, // Allow multiple image selection
+      quality: 0.7, // Reduced quality for smaller file size
+      maxWidth: 1024, // Limit image width
+      maxHeight: 1024, // Limit image height
+      selectionLimit: 3, // Reduced from 5 to avoid large uploads
       includeBase64: false,
     };
 
     launchImageLibrary(options, response => {
+      console.log('Gallery response:', response);
+
       if (response.didCancel) {
         console.log('User cancelled image picker');
       } else if (response.error) {
         console.log('ImagePicker Error: ', response.error);
-        Alert.alert('Error', 'Failed to select images');
+        Alert.alert('Error', 'Failed to select images: ' + response.error);
       } else if (response.assets && response.assets.length > 0) {
+        console.log('Gallery selected images:', response.assets);
         uploadImages(response.assets);
+      } else {
+        Alert.alert('Error', 'No images selected');
       }
     });
   };
@@ -362,6 +384,94 @@ const VenueScreen = ({ navigation }) => {
       },
       { text: 'OK', style: 'cancel' },
     ]);
+  };
+
+  // Debug function to check image data
+  const debugImageData = () => {
+    console.log('Current venue images:', venueImages);
+    console.log('Number of images:', venueImages.length);
+
+    let debugText = `Images loaded: ${venueImages.length}\n\n`;
+
+    if (venueImages.length > 0) {
+      venueImages.forEach((image, index) => {
+        debugText += `Image ${index + 1}:\n`;
+        debugText += `ID: ${image.id}\n`;
+        debugText += `URL: ${image.image || 'No URL'}\n`;
+        debugText += `Created: ${image.created_at || 'No date'}\n\n`;
+      });
+    } else {
+      debugText += 'No images found.\n\n';
+      debugText += 'Possible issues:\n';
+      debugText += '• Images not uploaded correctly\n';
+      debugText += '• API response format changed\n';
+      debugText += '• Network connection issues\n';
+      debugText += '• Authentication problems';
+    }
+
+    Alert.alert('Image Debug Info', debugText, [
+      {
+        text: 'Test Upload',
+        onPress: () => testImageUpload(),
+      },
+      {
+        text: 'Reload Images',
+        onPress: () => loadVenueImages(),
+      },
+      { text: 'OK', style: 'cancel' },
+    ]);
+  };
+
+  // Test function to check upload API
+  const testImageUpload = async () => {
+    if (!token) {
+      Alert.alert('Error', 'No authentication token');
+      return;
+    }
+
+    Alert.alert(
+      'Test Upload',
+      'This will test the upload API with a dummy request',
+      [
+        {
+          text: 'Test API Connection',
+          onPress: async () => {
+            try {
+              console.log('Testing API connection...');
+              const testFormData = new FormData();
+              testFormData.append('test', 'connection');
+
+              const response = await fetch(
+                'https://easeevent.echogen.online/venue/images/post/',
+                {
+                  method: 'POST',
+                  headers: {
+                    Authorization: `Token ${token}`,
+                  },
+                  body: testFormData,
+                },
+              );
+
+              console.log('Test response status:', response.status);
+              const responseText = await response.text();
+              console.log('Test response:', responseText);
+
+              Alert.alert(
+                'API Test Result',
+                `Status: ${response.status}\nResponse: ${responseText.substring(
+                  0,
+                  200,
+                )}...`,
+              );
+            } catch (error) {
+              console.error('Test API error:', error);
+              Alert.alert('API Test Failed', error.message);
+            }
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    );
   };
   // Request camera permission
   const requestCameraPermission = async () => {
@@ -429,22 +539,62 @@ const VenueScreen = ({ navigation }) => {
       return;
     }
 
+    if (!selectedImages || selectedImages.length === 0) {
+      Alert.alert('Error', 'No images selected');
+      return;
+    }
+
+    console.log('Starting image upload...', selectedImages);
+    console.log(
+      'Selected images details:',
+      selectedImages.map(img => ({
+        uri: img.uri,
+        fileName: img.fileName,
+        type: img.type,
+        fileSize: img.fileSize,
+      })),
+    );
+
     setIsUploadingImages(true);
     try {
       const result = await uploadVenueImages(token, selectedImages);
+
+      console.log('Upload result:', result);
 
       if (result.success) {
         Alert.alert(
           'Success',
           `${selectedImages.length} image(s) uploaded successfully!`,
+          [
+            {
+              text: 'OK',
+              onPress: async () => {
+                console.log('Refreshing images after upload...');
+                await loadVenueImages();
+                console.log('Images refreshed after upload');
+              },
+            },
+          ],
         );
-        await loadVenueImages(); // Refresh images list
       } else {
-        Alert.alert('Error', result.error || 'Failed to upload images');
+        console.error('Upload failed:', result);
+        let errorMessage = result.error || 'Failed to upload images';
+
+        // Add more specific error messages
+        if (result.status === 413) {
+          errorMessage = 'Images are too large. Please select smaller images.';
+        } else if (result.status === 401) {
+          errorMessage = 'Authentication failed. Please login again.';
+        } else if (result.status === 400) {
+          errorMessage =
+            'Invalid image format. Please select JPG or PNG images.';
+        }
+
+        Alert.alert('Upload Failed', errorMessage);
       }
     } catch (error) {
       console.error('Upload error:', error);
-      Alert.alert('Error', 'Failed to upload images');
+      Alert.alert('Error', 'Failed to upload images. Please try again.');
     } finally {
       setIsUploadingImages(false);
     }
@@ -601,24 +751,52 @@ const VenueScreen = ({ navigation }) => {
   );
 
   // Image gallery component
-  const renderImageItem = ({ item, index }) => (
-    <TouchableOpacity
-      style={styles.imageItem}
-      onPress={() => openImageGallery(index)}
-    >
-      <Image
-        source={{ uri: `https://easeevent.echogen.online${item.image}` }}
-        style={styles.imageItemPhoto}
-        resizeMode="cover"
-      />
+  const renderImageItem = ({ item, index }) => {
+    console.log('Rendering image item:', item);
+
+    // Handle different URL formats
+    let imageUri = '';
+    if (item.image) {
+      if (item.image.startsWith('http')) {
+        imageUri = item.image;
+      } else if (item.image.startsWith('/')) {
+        imageUri = `https://easeevent.echogen.online${item.image}`;
+      } else {
+        imageUri = `https://easeevent.echogen.online/${item.image}`;
+      }
+    }
+
+    console.log('Image URI:', imageUri);
+
+    return (
       <TouchableOpacity
-        style={styles.deleteImageButton}
-        onPress={() => handleDeleteImage(item.id, index)}
+        style={styles.imageItem}
+        onPress={() => openImageGallery(index)}
       >
-        <Ionicons name="close-circle" size={24} color={colors.error} />
+        <Image
+          source={{ uri: imageUri }}
+          style={styles.imageItemPhoto}
+          resizeMode="cover"
+          onError={error => {
+            console.error('Image load error:', error);
+            console.error('Failed image URI:', imageUri);
+          }}
+          onLoad={() => {
+            console.log('Image loaded successfully:', imageUri);
+          }}
+          onLoadStart={() => {
+            console.log('Image loading started:', imageUri);
+          }}
+        />
+        <TouchableOpacity
+          style={styles.deleteImageButton}
+          onPress={() => handleDeleteImage(item.id, index)}
+        >
+          <Ionicons name="close-circle" size={24} color={colors.error} />
+        </TouchableOpacity>
       </TouchableOpacity>
-    </TouchableOpacity>
-  );
+    );
+  };
 
   const ImageGallerySection = () => (
     <View style={styles.imageGallerySection}>
@@ -899,13 +1077,37 @@ const VenueScreen = ({ navigation }) => {
 
           {venueImages.length > 0 && venueImages[selectedImageIndex] && (
             <View style={styles.fullScreenImageContainer}>
-              <Image
-                source={{
-                  uri: `https://easeevent.echogen.online${venueImages[selectedImageIndex].image}`,
-                }}
-                style={styles.fullScreenImage}
-                resizeMode="contain"
-              />
+              {(() => {
+                const currentImage = venueImages[selectedImageIndex];
+                let imageUri = '';
+                if (currentImage.image) {
+                  if (currentImage.image.startsWith('http')) {
+                    imageUri = currentImage.image;
+                  } else if (currentImage.image.startsWith('/')) {
+                    imageUri = `https://easeevent.echogen.online${currentImage.image}`;
+                  } else {
+                    imageUri = `https://easeevent.echogen.online/${currentImage.image}`;
+                  }
+                }
+
+                return (
+                  <Image
+                    source={{ uri: imageUri }}
+                    style={styles.fullScreenImage}
+                    resizeMode="contain"
+                    onError={error => {
+                      console.error('Full screen image load error:', error);
+                      console.error('Failed full screen image URI:', imageUri);
+                    }}
+                    onLoad={() => {
+                      console.log(
+                        'Full screen image loaded successfully:',
+                        imageUri,
+                      );
+                    }}
+                  />
+                );
+              })()}
 
               {/* Navigation arrows */}
               {venueImages.length > 1 && (
