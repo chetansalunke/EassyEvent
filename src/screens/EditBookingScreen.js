@@ -28,7 +28,6 @@ import { getScreenSafeArea } from '../utils/safeArea';
 const EditBookingScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
-  console.log('Auth token:', token); // Debug: print token
   const { eventId, isEdit = false } = route.params || {};
 
   // Form state
@@ -65,7 +64,7 @@ const EditBookingScreen = ({ navigation, route }) => {
 
   // Debug effect to monitor form data changes
   useEffect(() => {
-    console.log('Form data updated:', formData);
+    // Form data monitoring for debugging if needed
   }, [formData]);
 
   const loadEventData = async () => {
@@ -98,7 +97,6 @@ const EditBookingScreen = ({ navigation, route }) => {
   };
 
   const handleInputChange = (field, value) => {
-    console.log(`Updating ${field} with value:`, value); // Debug log
     setFormData(prev => ({ ...prev, [field]: value }));
     // Clear error when user starts typing
     if (errors[field]) {

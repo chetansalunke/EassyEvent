@@ -17,8 +17,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  console.log('Token ');
-  console.log(token);
+
   // Check for existing authentication on app start
   useEffect(() => {
     checkAuthState();
