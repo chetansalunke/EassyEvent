@@ -28,6 +28,7 @@ import { getScreenSafeArea } from '../utils/safeArea';
 const EditBookingScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
+  console.log('Auth token:', token); // Debug: print token
   const { eventId, isEdit = false } = route.params || {};
 
   // Form state

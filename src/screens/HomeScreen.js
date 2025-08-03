@@ -39,7 +39,10 @@ const HomeScreen = ({ navigation }) => {
   const [dashboardStats, setDashboardStats] = useState(null);
   const [venueDetails, setVenueDetails] = useState(null);
   const { user, logout, isAuthenticated, token } = useAuth();
-
+  // Print token once on mount for debugging
+  useEffect(() => {
+    console.log('Auth token:', token);
+  }, [token]);
   // Auth protection - redirect to login if not authenticated
   useEffect(() => {
     if (!isAuthenticated) {
