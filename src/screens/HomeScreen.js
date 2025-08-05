@@ -593,7 +593,6 @@ const HomeScreen = ({ navigation }) => {
               </TouchableOpacity>
             </View>
           </View>
-          // (Booking stats styles moved into StyleSheet.create below)
         </ScrollView>
 
         {/* Device-Adaptive Bottom Navigation */}
