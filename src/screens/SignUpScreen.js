@@ -10,6 +10,8 @@ import {
   StyleSheet,
   SafeAreaView,
   Image,
+  StatusBar,
+  Platform,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { colors } from '../utils/colors';
@@ -325,8 +327,13 @@ const SignUpScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={colors.background}
+        translucent={false}
+      />
       <TouchableOpacity
-        style={styles.container}
+        style={styles.content}
         activeOpacity={1}
         onPress={() => {
           setShowCityDropdown(false);
@@ -338,6 +345,7 @@ const SignUpScreen = ({ navigation }) => {
           style={styles.screen}
           contentContainerStyle={styles.scrollContainer}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
             <TouchableOpacity
@@ -346,13 +354,13 @@ const SignUpScreen = ({ navigation }) => {
             >
               <Ionicons name="arrow-back" size={24} color={colors.secondary} />
             </TouchableOpacity>
-            <View style={styles.logoContainer}>
+            {/* <View style={styles.logoContainer}>
               <Image
-                source={require('../../assets/logo.png')} // Update this path to your logo image
+                source={require('../../assets/logo.jpeg')} // Update this path to your logo image
                 style={styles.logoImage}
                 resizeMode="contain"
               />
-            </View>
+            </View> */}
           </View>
 
           <View style={styles.formContainer}>
@@ -679,16 +687,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  content: {
+    flex: 1,
+  },
   screen: {
     flex: 1,
     backgroundColor: colors.background,
   },
   scrollContainer: {
     flexGrow: 1,
-    paddingBottom: 20,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 20,
   },
   header: {
-    paddingTop: 20,
+    paddingTop: Platform.OS === 'ios' ? 10 : 20,
     paddingHorizontal: 20,
     paddingBottom: 30,
     alignItems: 'center',
@@ -697,22 +708,24 @@ const styles = StyleSheet.create({
   backButton: {
     position: 'absolute',
     left: 20,
-    top: 20,
+    top: Platform.OS === 'ios' ? 10 : 20,
     padding: 8,
     borderRadius: 20,
     backgroundColor: colors.lightGray,
+    zIndex: 1,
   },
   logoContainer: {
     alignItems: 'center',
     marginBottom: 20,
   },
   logoImage: {
-    width: 120,
-    height: 80,
+    width: 150,
+    height: 180,
   },
   formContainer: {
     flex: 1,
     paddingHorizontal: 20,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 10,
   },
   welcomeTitle: {
     fontSize: 24,
@@ -834,6 +847,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
     marginBottom: 24,
+    marginTop: 10,
   },
   disabledButton: {
     opacity: 0.6,
@@ -866,7 +880,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: colors.lightGray,
     borderRadius: 8,
-    marginBottom: 20,
+    marginBottom: Platform.OS === 'ios' ? 20 : 10,
   },
   securityText: {
     fontSize: 12,
