@@ -10,8 +10,6 @@ import {
   StyleSheet,
   SafeAreaView,
   Image,
-  Modal,
-  FlatList,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { colors } from '../utils/colors';
@@ -87,9 +85,9 @@ const SignUpScreen = ({ navigation }) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
-  const [showCityModal, setShowCityModal] = useState(false);
-  const [showStateModal, setShowStateModal] = useState(false);
-  const [showRateTypeModal, setShowRateTypeModal] = useState(false);
+  const [showCityDropdown, setShowCityDropdown] = useState(false);
+  const [showStateDropdown, setShowStateDropdown] = useState(false);
+  const [showRateTypeDropdown, setShowRateTypeDropdown] = useState(false);
 
   // Refs for PIN code inputs
   const pinRefs = useRef([]);
@@ -254,7 +252,7 @@ const SignUpScreen = ({ navigation }) => {
   // Handle dropdown selections
   const selectCity = city => {
     setFormData(prev => ({ ...prev, city }));
-    setShowCityModal(false);
+    setShowCityDropdown(false);
     if (errors.city) {
       setErrors(prev => ({ ...prev, city: null }));
     }
@@ -262,7 +260,7 @@ const SignUpScreen = ({ navigation }) => {
 
   const selectState = state => {
     setFormData(prev => ({ ...prev, state }));
-    setShowStateModal(false);
+    setShowStateDropdown(false);
     if (errors.state) {
       setErrors(prev => ({ ...prev, state: null }));
     }
@@ -270,416 +268,412 @@ const SignUpScreen = ({ navigation }) => {
 
   const selectRateType = rateType => {
     setFormData(prev => ({ ...prev, rateType }));
-    setShowRateTypeModal(false);
+    setShowRateTypeDropdown(false);
     if (errors.rateType) {
       setErrors(prev => ({ ...prev, rateType: null }));
     }
   };
 
-  // Render dropdown modal
-  const renderDropdownModal = (visible, onClose, data, onSelect, title) => (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
+  // Simple dropdown component
+  const SimpleDropdown = ({
+    value,
+    placeholder,
+    data,
+    onSelect,
+    isOpen,
+    onToggle,
+    error,
+  }) => (
+    <View style={styles.dropdownWrapper}>
       <TouchableOpacity
-        style={styles.modalOverlay}
-        activeOpacity={1}
-        onPress={onClose}
+        style={[styles.input, styles.dropdown, error && styles.inputError]}
+        onPress={onToggle}
+        activeOpacity={0.7}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{title}</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color={colors.secondary} />
-            </TouchableOpacity>
-          </View>
-          {data && data.length > 0 ? (
-            <FlatList
-              data={data}
-              keyExtractor={(item, index) => `${item}-${index}`}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.modalItem}
-                  onPress={() => onSelect(item)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.modalItemText}>{item}</Text>
-                </TouchableOpacity>
-              )}
-              showsVerticalScrollIndicator={false}
-            />
-          ) : (
-            <View style={styles.noDataContainer}>
-              <Text style={styles.noDataText}>No data available</Text>
-            </View>
-          )}
-        </View>
+        <Text style={value ? styles.inputText : styles.placeholder}>
+          {value || placeholder}
+        </Text>
+        <Ionicons
+          name={isOpen ? 'chevron-up' : 'chevron-down'}
+          size={20}
+          color={colors.gray}
+        />
       </TouchableOpacity>
-    </Modal>
+
+      {isOpen && (
+        <View style={styles.dropdownList}>
+          <ScrollView
+            style={styles.dropdownScrollView}
+            nestedScrollEnabled={true}
+            keyboardShouldPersistTaps="handled"
+          >
+            {data.map((item, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.dropdownItem}
+                onPress={() => onSelect(item)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.dropdownItemText}>{item}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+    </View>
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView
-        style={styles.screen}
-        contentContainerStyle={styles.scrollContainer}
+      <TouchableOpacity
+        style={styles.container}
+        activeOpacity={1}
+        onPress={() => {
+          setShowCityDropdown(false);
+          setShowStateDropdown(false);
+          setShowRateTypeDropdown(false);
+        }}
       >
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="arrow-back" size={24} color={colors.secondary} />
-          </TouchableOpacity>
-          <View style={styles.logoContainer}>
-            <Image
-              source={require('../../assets/logo.png')} // Update this path to your logo image
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
-          </View>
-        </View>
-
-        <View style={styles.formContainer}>
-          <Text style={styles.welcomeTitle}>Sign Up</Text>
-          <Text style={styles.welcomeSubtitle}>
-            Join us and start to manage your bookings efficiently.
-          </Text>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Email</Text>
-            <TextInput
-              style={[styles.input, errors.email && styles.inputError]}
-              value={formData.email}
-              onChangeText={value => updateFormData('email', value)}
-              placeholder="Please enter a valid email address"
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-            {errors.email && (
-              <Text style={styles.errorText}>{errors.email}</Text>
-            )}
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Venue Name</Text>
-            <TextInput
-              style={[styles.input, errors.name && styles.inputError]}
-              value={formData.name}
-              onChangeText={value => updateFormData('name', value)}
-              placeholder="e.g., The Royal Orchid Banquets"
-              autoCorrect={false}
-            />
-            {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Mobile Number</Text>
-            <TextInput
-              style={[styles.input, errors.mobile && styles.inputError]}
-              value={formData.mobile}
-              onChangeText={value => updateFormData('mobile', value)}
-              placeholder="e.g., 9876543210"
-              keyboardType="phone-pad"
-              maxLength={10}
-            />
-            {errors.mobile && (
-              <Text style={styles.errorText}>{errors.mobile}</Text>
-            )}
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Address Line 1</Text>
-            <TextInput
-              style={[styles.input, errors.addressLine1 && styles.inputError]}
-              value={formData.addressLine1}
-              onChangeText={value => updateFormData('addressLine1', value)}
-              placeholder="Building name, street, or locality"
-            />
-            {errors.addressLine1 && (
-              <Text style={styles.errorText}>{errors.addressLine1}</Text>
-            )}
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Address Line 2 (Optional)</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.addressLine2}
-              onChangeText={value => updateFormData('addressLine2', value)}
-              placeholder="Landmark or additional address details"
-            />
-          </View>
-
-          <View style={styles.row}>
-            <View style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}>
-              <Text style={styles.inputLabel}>City</Text>
-              <TouchableOpacity
-                style={[
-                  styles.input,
-                  styles.dropdown,
-                  errors.city && styles.inputError,
-                ]}
-                onPress={() => setShowCityModal(true)}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={formData.city ? styles.inputText : styles.placeholder}
-                >
-                  {formData.city || 'Select the city'}
-                </Text>
-                <Ionicons name="chevron-down" size={20} color={colors.gray} />
-              </TouchableOpacity>
-              {errors.city && (
-                <Text style={styles.errorText}>{errors.city}</Text>
-              )}
-            </View>
-
-            <View style={[styles.inputContainer, { flex: 1, marginLeft: 10 }]}>
-              <Text style={styles.inputLabel}>State</Text>
-              <TouchableOpacity
-                style={[
-                  styles.input,
-                  styles.dropdown,
-                  errors.state && styles.inputError,
-                ]}
-                onPress={() => setShowStateModal(true)}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={formData.state ? styles.inputText : styles.placeholder}
-                >
-                  {formData.state || 'Select the state'}
-                </Text>
-                <Ionicons name="chevron-down" size={20} color={colors.gray} />
-              </TouchableOpacity>
-              {errors.state && (
-                <Text style={styles.errorText}>{errors.state}</Text>
-              )}
-            </View>
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>PIN Code</Text>
-            <View style={styles.pinContainer}>
-              {[0, 1, 2, 3, 4, 5].map(index => (
-                <TextInput
-                  key={index}
-                  ref={ref => (pinRefs.current[index] = ref)}
-                  style={[styles.pinInput, errors.pinCode && styles.inputError]}
-                  value={formData.pinCode[index]}
-                  onChangeText={value => handlePinChange(index, value)}
-                  onKeyPress={({ nativeEvent }) =>
-                    handlePinKeyPress(index, nativeEvent.key)
-                  }
-                  maxLength={1}
-                  keyboardType="numeric"
-                  textAlign="center"
-                  returnKeyType={index === 5 ? 'done' : 'next'}
-                />
-              ))}
-            </View>
-            {errors.pinCode && (
-              <Text style={styles.errorText}>{errors.pinCode}</Text>
-            )}
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Seating Capacity</Text>
-            <View style={styles.capacityContainer}>
-              <TextInput
-                style={[
-                  styles.capacityInput,
-                  errors.seatingCapacity && styles.inputError,
-                ]}
-                value={formData.seatingCapacity}
-                onChangeText={value => updateFormData('seatingCapacity', value)}
-                placeholder="e.g., 250 guests"
-                keyboardType="numeric"
-              />
-              <TouchableOpacity
-                style={styles.capacityButton}
-                onPress={() => {
-                  const currentValue = parseInt(formData.seatingCapacity) || 0;
-                  updateFormData(
-                    'seatingCapacity',
-                    (currentValue + 50).toString(),
-                  );
-                }}
-              >
-                <Ionicons name="add" size={20} color={colors.gray} />
-              </TouchableOpacity>
-            </View>
-            {errors.seatingCapacity && (
-              <Text style={styles.errorText}>{errors.seatingCapacity}</Text>
-            )}
-          </View>
-
-          <View style={styles.row}>
-            <View style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}>
-              <Text style={styles.inputLabel}>Rate (₹)</Text>
-              <TextInput
-                style={[styles.input, errors.rate && styles.inputError]}
-                value={formData.rate}
-                onChangeText={value => updateFormData('rate', value)}
-                placeholder="e.g., 5000"
-                keyboardType="numeric"
-              />
-              {errors.rate && (
-                <Text style={styles.errorText}>{errors.rate}</Text>
-              )}
-            </View>
-
-            <View style={[styles.inputContainer, { flex: 1, marginLeft: 10 }]}>
-              <Text style={styles.inputLabel}>Rate Type</Text>
-              <TouchableOpacity
-                style={[
-                  styles.input,
-                  styles.dropdown,
-                  errors.rateType && styles.inputError,
-                ]}
-                onPress={() => setShowRateTypeModal(true)}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={
-                    formData.rateType ? styles.inputText : styles.placeholder
-                  }
-                >
-                  {formData.rateType || 'Select rate type'}
-                </Text>
-                <Ionicons name="chevron-down" size={20} color={colors.gray} />
-              </TouchableOpacity>
-              {errors.rateType && (
-                <Text style={styles.errorText}>{errors.rateType}</Text>
-              )}
-            </View>
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Password</Text>
-            <View style={styles.passwordContainer}>
-              <TextInput
-                style={[
-                  styles.passwordInput,
-                  errors.password && styles.inputError,
-                ]}
-                value={formData.password}
-                onChangeText={value => updateFormData('password', value)}
-                placeholder="Create a password (min. 8 characters)"
-                secureTextEntry={!showPassword}
-              />
-              <TouchableOpacity
-                style={styles.eyeButton}
-                onPress={() => setShowPassword(!showPassword)}
-              >
-                <Ionicons
-                  name={showPassword ? 'eye' : 'eye-off'}
-                  size={20}
-                  color={colors.gray}
-                />
-              </TouchableOpacity>
-            </View>
-            {errors.password && (
-              <Text style={styles.errorText}>{errors.password}</Text>
-            )}
-            <Text style={styles.passwordHint}>
-              Password must be at least 8 characters and contain at least one
-              uppercase letter, one lowercase letter, and one number.
-            </Text>
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Confirm Password</Text>
-            <View style={styles.passwordContainer}>
-              <TextInput
-                style={[
-                  styles.passwordInput,
-                  errors.confirmPassword && styles.inputError,
-                ]}
-                value={formData.confirmPassword}
-                onChangeText={value => updateFormData('confirmPassword', value)}
-                placeholder="Re-enter your password "
-                secureTextEntry={!showConfirmPassword}
-              />
-              <TouchableOpacity
-                style={styles.eyeButton}
-                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-              >
-                <Ionicons
-                  name={showConfirmPassword ? 'eye' : 'eye-off'}
-                  size={20}
-                  color={colors.gray}
-                />
-              </TouchableOpacity>
-            </View>
-            {errors.confirmPassword && (
-              <Text style={styles.errorText}>{errors.confirmPassword}</Text>
-            )}
-            <Text style={styles.passwordHint}>
-              Please enter your password for confirmation.
-            </Text>
-          </View>
-
-          <TouchableOpacity
-            style={[styles.primaryButton, isLoading && styles.disabledButton]}
-            onPress={handleSignUp}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.primaryButtonText}>Create Account</Text>
-            )}
-          </TouchableOpacity>
-
-          <View style={styles.signupContainer}>
-            <Text style={styles.signupText}>Already Registered? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-              <Text style={styles.signupLink}>Log in here</Text>
+        <ScrollView
+          style={styles.screen}
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.header}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Ionicons name="arrow-back" size={24} color={colors.secondary} />
             </TouchableOpacity>
+            <View style={styles.logoContainer}>
+              <Image
+                source={require('../../assets/logo.png')} // Update this path to your logo image
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
+            </View>
           </View>
 
-          <View style={styles.securityNote}>
-            <Ionicons name="lock-closed" size={16} color={colors.success} />
-            <Text style={styles.securityText}>
-              Your credentials are securely encrypted
+          <View style={styles.formContainer}>
+            <Text style={styles.welcomeTitle}>Sign Up</Text>
+            <Text style={styles.welcomeSubtitle}>
+              Join us and start to manage your bookings efficiently.
             </Text>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Email</Text>
+              <TextInput
+                style={[styles.input, errors.email && styles.inputError]}
+                value={formData.email}
+                onChangeText={value => updateFormData('email', value)}
+                placeholder="Please enter a valid email address"
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+              {errors.email && (
+                <Text style={styles.errorText}>{errors.email}</Text>
+              )}
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Venue Name</Text>
+              <TextInput
+                style={[styles.input, errors.name && styles.inputError]}
+                value={formData.name}
+                onChangeText={value => updateFormData('name', value)}
+                placeholder="e.g., The Royal Orchid Banquets"
+                autoCorrect={false}
+              />
+              {errors.name && (
+                <Text style={styles.errorText}>{errors.name}</Text>
+              )}
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Mobile Number</Text>
+              <TextInput
+                style={[styles.input, errors.mobile && styles.inputError]}
+                value={formData.mobile}
+                onChangeText={value => updateFormData('mobile', value)}
+                placeholder="e.g., 9876543210"
+                keyboardType="phone-pad"
+                maxLength={10}
+              />
+              {errors.mobile && (
+                <Text style={styles.errorText}>{errors.mobile}</Text>
+              )}
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Address Line 1</Text>
+              <TextInput
+                style={[styles.input, errors.addressLine1 && styles.inputError]}
+                value={formData.addressLine1}
+                onChangeText={value => updateFormData('addressLine1', value)}
+                placeholder="Building name, street, or locality"
+              />
+              {errors.addressLine1 && (
+                <Text style={styles.errorText}>{errors.addressLine1}</Text>
+              )}
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Address Line 2 (Optional)</Text>
+              <TextInput
+                style={styles.input}
+                value={formData.addressLine2}
+                onChangeText={value => updateFormData('addressLine2', value)}
+                placeholder="Landmark or additional address details"
+              />
+            </View>
+
+            <View style={styles.row}>
+              <View
+                style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}
+              >
+                <Text style={styles.inputLabel}>City</Text>
+                <SimpleDropdown
+                  value={formData.city}
+                  placeholder="Select the city"
+                  data={SIMPLE_CITIES}
+                  onSelect={selectCity}
+                  isOpen={showCityDropdown}
+                  onToggle={() => {
+                    setShowCityDropdown(!showCityDropdown);
+                    setShowStateDropdown(false);
+                    setShowRateTypeDropdown(false);
+                  }}
+                  error={errors.city}
+                />
+                {errors.city && (
+                  <Text style={styles.errorText}>{errors.city}</Text>
+                )}
+              </View>
+
+              <View
+                style={[styles.inputContainer, { flex: 1, marginLeft: 10 }]}
+              >
+                <Text style={styles.inputLabel}>State</Text>
+                <SimpleDropdown
+                  value={formData.state}
+                  placeholder="Select the state"
+                  data={SIMPLE_STATES}
+                  onSelect={selectState}
+                  isOpen={showStateDropdown}
+                  onToggle={() => {
+                    setShowStateDropdown(!showStateDropdown);
+                    setShowCityDropdown(false);
+                    setShowRateTypeDropdown(false);
+                  }}
+                  error={errors.state}
+                />
+                {errors.state && (
+                  <Text style={styles.errorText}>{errors.state}</Text>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>PIN Code</Text>
+              <View style={styles.pinContainer}>
+                {[0, 1, 2, 3, 4, 5].map(index => (
+                  <TextInput
+                    key={index}
+                    ref={ref => (pinRefs.current[index] = ref)}
+                    style={[
+                      styles.pinInput,
+                      errors.pinCode && styles.inputError,
+                    ]}
+                    value={formData.pinCode[index]}
+                    onChangeText={value => handlePinChange(index, value)}
+                    onKeyPress={({ nativeEvent }) =>
+                      handlePinKeyPress(index, nativeEvent.key)
+                    }
+                    maxLength={1}
+                    keyboardType="numeric"
+                    textAlign="center"
+                    returnKeyType={index === 5 ? 'done' : 'next'}
+                  />
+                ))}
+              </View>
+              {errors.pinCode && (
+                <Text style={styles.errorText}>{errors.pinCode}</Text>
+              )}
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Seating Capacity</Text>
+              <View style={styles.capacityContainer}>
+                <TextInput
+                  style={[
+                    styles.capacityInput,
+                    errors.seatingCapacity && styles.inputError,
+                  ]}
+                  value={formData.seatingCapacity}
+                  onChangeText={value =>
+                    updateFormData('seatingCapacity', value)
+                  }
+                  placeholder="e.g., 250 guests"
+                  keyboardType="numeric"
+                />
+                <TouchableOpacity
+                  style={styles.capacityButton}
+                  onPress={() => {
+                    const currentValue =
+                      parseInt(formData.seatingCapacity) || 0;
+                    updateFormData(
+                      'seatingCapacity',
+                      (currentValue + 50).toString(),
+                    );
+                  }}
+                >
+                  <Ionicons name="add" size={20} color={colors.gray} />
+                </TouchableOpacity>
+              </View>
+              {errors.seatingCapacity && (
+                <Text style={styles.errorText}>{errors.seatingCapacity}</Text>
+              )}
+            </View>
+
+            <View style={styles.row}>
+              <View
+                style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}
+              >
+                <Text style={styles.inputLabel}>Rate (₹)</Text>
+                <TextInput
+                  style={[styles.input, errors.rate && styles.inputError]}
+                  value={formData.rate}
+                  onChangeText={value => updateFormData('rate', value)}
+                  placeholder="e.g., 5000"
+                  keyboardType="numeric"
+                />
+                {errors.rate && (
+                  <Text style={styles.errorText}>{errors.rate}</Text>
+                )}
+              </View>
+
+              <View
+                style={[styles.inputContainer, { flex: 1, marginLeft: 10 }]}
+              >
+                <Text style={styles.inputLabel}>Rate Type</Text>
+                <SimpleDropdown
+                  value={formData.rateType}
+                  placeholder="Select rate type"
+                  data={RATE_TYPES}
+                  onSelect={selectRateType}
+                  isOpen={showRateTypeDropdown}
+                  onToggle={() => {
+                    setShowRateTypeDropdown(!showRateTypeDropdown);
+                    setShowCityDropdown(false);
+                    setShowStateDropdown(false);
+                  }}
+                  error={errors.rateType}
+                />
+                {errors.rateType && (
+                  <Text style={styles.errorText}>{errors.rateType}</Text>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Password</Text>
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  style={[
+                    styles.passwordInput,
+                    errors.password && styles.inputError,
+                  ]}
+                  value={formData.password}
+                  onChangeText={value => updateFormData('password', value)}
+                  placeholder="Create a password"
+                  secureTextEntry={!showPassword}
+                />
+                <TouchableOpacity
+                  style={styles.eyeButton}
+                  onPress={() => setShowPassword(!showPassword)}
+                >
+                  <Ionicons
+                    name={showPassword ? 'eye' : 'eye-off'}
+                    size={20}
+                    color={colors.gray}
+                  />
+                </TouchableOpacity>
+              </View>
+              {errors.password && (
+                <Text style={styles.errorText}>{errors.password}</Text>
+              )}
+              <Text style={styles.passwordHint}>
+                Password must be at least 8 characters and contain at least one
+                uppercase letter, one lowercase letter, and one number.
+              </Text>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Confirm Password</Text>
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  style={[
+                    styles.passwordInput,
+                    errors.confirmPassword && styles.inputError,
+                  ]}
+                  value={formData.confirmPassword}
+                  onChangeText={value =>
+                    updateFormData('confirmPassword', value)
+                  }
+                  placeholder="Re-enter your password "
+                  secureTextEntry={!showConfirmPassword}
+                />
+                <TouchableOpacity
+                  style={styles.eyeButton}
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  <Ionicons
+                    name={showConfirmPassword ? 'eye' : 'eye-off'}
+                    size={20}
+                    color={colors.gray}
+                  />
+                </TouchableOpacity>
+              </View>
+              {errors.confirmPassword && (
+                <Text style={styles.errorText}>{errors.confirmPassword}</Text>
+              )}
+              <Text style={styles.passwordHint}>
+                Please enter your password for confirmation.
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.primaryButton, isLoading && styles.disabledButton]}
+              onPress={handleSignUp}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.primaryButtonText}>Create Account</Text>
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.signupContainer}>
+              <Text style={styles.signupText}>Already Registered? </Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+                <Text style={styles.signupLink}>Log in here</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.securityNote}>
+              <Ionicons name="lock-closed" size={16} color={colors.success} />
+              <Text style={styles.securityText}>
+                Your credentials are securely encrypted
+              </Text>
+            </View>
           </View>
-
-          {/* Modals for dropdowns */}
-          {renderDropdownModal(
-            showCityModal,
-            () => setShowCityModal(false),
-            SIMPLE_CITIES,
-            selectCity,
-            'Select City',
-          )}
-
-          {renderDropdownModal(
-            showStateModal,
-            () => setShowStateModal(false),
-            SIMPLE_STATES,
-            selectState,
-            'Select State',
-          )}
-
-          {renderDropdownModal(
-            showRateTypeModal,
-            () => setShowRateTypeModal(false),
-            RATE_TYPES,
-            selectRateType,
-            'Select Rate Type',
-          )}
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 };
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -768,6 +762,45 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  dropdownWrapper: {
+    position: 'relative',
+    zIndex: 1000,
+  },
+  dropdownList: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+    maxHeight: 150,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    zIndex: 1001,
+  },
+  dropdownScrollView: {
+    maxHeight: 150,
+  },
+  dropdownItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.lightGray,
+  },
+  dropdownItemText: {
+    fontSize: 16,
+    color: colors.secondary,
   },
   disabledDropdown: {
     backgroundColor: colors.lightGray,
@@ -894,56 +927,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.error,
     marginTop: 4,
-  },
-  // Modal styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContainer: {
-    backgroundColor: colors.background,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '70%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.secondary,
-  },
-  closeButton: {
-    padding: 4,
-    borderRadius: 20,
-  },
-  modalItem: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray,
-  },
-  modalItemText: {
-    fontSize: 16,
-    color: colors.secondary,
-  },
-  noDataContainer: {
-    padding: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  noDataText: {
-    fontSize: 16,
-    color: colors.gray,
-    textAlign: 'center',
-    lineHeight: 22,
   },
 });
 
