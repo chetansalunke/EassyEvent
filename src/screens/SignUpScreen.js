@@ -71,6 +71,7 @@ const SignUpScreen = ({ navigation }) => {
   const [formData, setFormData] = useState({
     email: '',
     name: '',
+    mobile: '',
     addressLine1: '',
     addressLine2: '',
     city: '',
@@ -97,6 +98,7 @@ const SignUpScreen = ({ navigation }) => {
     const formRules = {
       email: validationRules.email,
       name: validationRules.name,
+      mobile: validationRules.phone,
       addressLine1: {
         required: true,
         minLength: 5,
@@ -157,6 +159,7 @@ const SignUpScreen = ({ navigation }) => {
       const userData = {
         email: formData.email.toLowerCase().trim(),
         venue_name: formData.name.trim(),
+        mobile: formData.mobile.trim(),
         address_line1: formData.addressLine1.trim(),
         address_line2: formData.addressLine2.trim(),
         city: formData.city,
@@ -343,7 +346,7 @@ const SignUpScreen = ({ navigation }) => {
         <View style={styles.formContainer}>
           <Text style={styles.welcomeTitle}>Sign Up</Text>
           <Text style={styles.welcomeSubtitle}>
-            Join us and start to efficiently manage your bookings.
+            Join us and start to manage your bookings efficiently.
           </Text>
 
           <View style={styles.inputContainer}>
@@ -371,6 +374,21 @@ const SignUpScreen = ({ navigation }) => {
               autoCorrect={false}
             />
             {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Mobile Number</Text>
+            <TextInput
+              style={[styles.input, errors.mobile && styles.inputError]}
+              value={formData.mobile}
+              onChangeText={value => updateFormData('mobile', value)}
+              placeholder="e.g., 9876543210"
+              keyboardType="phone-pad"
+              maxLength={10}
+            />
+            {errors.mobile && (
+              <Text style={styles.errorText}>{errors.mobile}</Text>
+            )}
           </View>
 
           <View style={styles.inputContainer}>
