@@ -185,19 +185,16 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   header: {
-    paddingTop: 20,
     paddingHorizontal: 20,
-    paddingBottom: 30,
     alignItems: 'center',
     position: 'relative',
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 50,
   },
   logoImage: {
     width: 120,
-    height: 80,
+    height: 180,
   },
   formContainer: {
     flex: 1,
