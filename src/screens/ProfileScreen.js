@@ -191,6 +191,7 @@ const ProfileScreen = ({ navigation }) => {
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Ionicons name="arrow-back" size={24} color={colors.secondary} />
           </TouchableOpacity>
@@ -214,11 +215,16 @@ const ProfileScreen = ({ navigation }) => {
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Ionicons name="arrow-back" size={24} color={colors.secondary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Profile</Text>
-        <TouchableOpacity style={styles.editButton} onPress={handleEditVenue}>
+        <TouchableOpacity
+          style={styles.editButton}
+          onPress={handleEditVenue}
+          hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+        >
           <Ionicons name="create-outline" size={24} color={colors.primary} />
         </TouchableOpacity>
       </View>
@@ -583,9 +589,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   backButton: {
-    padding: 8,
-    borderRadius: 20,
+    padding: 12,
+    borderRadius: 25,
     backgroundColor: colors.lightGray,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 44,
+    minHeight: 44,
   },
   headerTitle: {
     fontSize: 18,
@@ -599,9 +609,13 @@ const styles = StyleSheet.create({
     width: 40,
   },
   editButton: {
-    padding: 8,
-    borderRadius: 20,
+    padding: 12,
+    borderRadius: 25,
     backgroundColor: colors.lightGray,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 44,
+    minHeight: 44,
   },
   content: {
     flex: 1,
