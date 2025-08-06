@@ -11,6 +11,7 @@ import {
   Modal,
   Platform,
   SafeAreaView,
+  BackHandler,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -63,6 +64,19 @@ const EditBookingScreen = ({ navigation, route }) => {
     }
   }, [isEdit, eventId, token]);
 
+  // Handle Android back button
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        handleBackPress();
+        return true; // Prevent default behavior
+      },
+    );
+
+    return () => backHandler.remove();
+  }, []);
+
   // Debug effect to monitor form data changes
   useEffect(() => {
     // Form data monitoring for debugging if needed
@@ -87,11 +101,11 @@ const EditBookingScreen = ({ navigation, route }) => {
         });
       } else {
         Alert.alert('Error', result.error || 'Failed to load event data');
-        navigation.goBack();
+        handleBackPress();
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to load event data');
-      navigation.goBack();
+      handleBackPress();
     } finally {
       setIsLoading(false);
     }
@@ -102,6 +116,18 @@ const EditBookingScreen = ({ navigation, route }) => {
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: null }));
+    }
+  };
+
+  const handleBackPress = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      // If can't go back, navigate to Events screen or Home
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Events' }],
+      });
     }
   };
 
@@ -365,7 +391,7 @@ const EditBookingScreen = ({ navigation, route }) => {
             {
               text: 'OK',
               onPress: () => {
-                navigation.goBack();
+                handleBackPress();
               },
             },
           ],
@@ -398,10 +424,7 @@ const EditBookingScreen = ({ navigation, route }) => {
     <SafeAreaView style={[styles.container, getScreenSafeArea(insets)]}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
           <Ionicons name="arrow-back" size={24} color={colors.secondary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
