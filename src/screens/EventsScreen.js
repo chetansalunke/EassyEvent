@@ -788,7 +788,7 @@ const EventsScreen = ({ navigation }) => {
                     </View>
                   </View>
 
-                  <View style={styles.detailRow}>
+                  {/* <View style={styles.detailRow}>
                     <Ionicons name="card" size={20} color={colors.primary} />
                     <View style={styles.detailTextContainer}>
                       <Text style={styles.detailLabel}>Payment Status</Text>
@@ -819,7 +819,7 @@ const EventsScreen = ({ navigation }) => {
                         </Text>
                       </View>
                     </View>
-                  </View>
+                  </View> */}
 
                   <View style={styles.detailRow}>
                     <Ionicons name="time" size={20} color={colors.primary} />

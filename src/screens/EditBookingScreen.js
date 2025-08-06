@@ -48,11 +48,12 @@ const EditBookingScreen = ({ navigation, route }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showPaymentStatusDropdown, setShowPaymentStatusDropdown] =
+    useState(false);
   const [currentDateField, setCurrentDateField] = useState('');
   const [currentTimeField, setCurrentTimeField] = useState('');
   const [tempDate, setTempDate] = useState(new Date());
   const [tempTime, setTempTime] = useState(new Date());
-  const [showPaymentStatusModal, setShowPaymentStatusModal] = useState(false);
   const [errors, setErrors] = useState({});
 
   // Load event data if editing
@@ -272,6 +273,66 @@ const EditBookingScreen = ({ navigation, route }) => {
       return 'Select Time';
     }
   };
+
+  // Payment status selection handler
+  const selectPaymentStatus = status => {
+    handleInputChange('payment_status', status.value);
+    setShowPaymentStatusDropdown(false);
+  };
+
+  // Simple dropdown component
+  const SimpleDropdown = ({
+    value,
+    placeholder,
+    data,
+    onSelect,
+    isOpen,
+    onToggle,
+    error,
+  }) => (
+    <View style={styles.dropdownWrapper}>
+      <TouchableOpacity
+        style={[styles.input, styles.dropdown, error && styles.inputError]}
+        onPress={onToggle}
+        activeOpacity={0.7}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
+        <Text style={value ? styles.inputText : styles.placeholder}>
+          {value || placeholder}
+        </Text>
+        <Ionicons
+          name={isOpen ? 'chevron-up' : 'chevron-down'}
+          size={20}
+          color={colors.gray}
+        />
+      </TouchableOpacity>
+
+      {isOpen && (
+        <View style={styles.dropdownList}>
+          <ScrollView
+            style={styles.dropdownScrollView}
+            nestedScrollEnabled={true}
+            keyboardShouldPersistTaps="handled"
+          >
+            {data.map((item, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.dropdownItem,
+                  index === data.length - 1 && styles.dropdownItemLast,
+                ]}
+                onPress={() => onSelect(item)}
+                activeOpacity={0.7}
+                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+              >
+                <Text style={styles.dropdownItemText}>{item.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+    </View>
+  );
 
   const handleSave = async () => {
     // Validate form data
@@ -500,17 +561,20 @@ const EditBookingScreen = ({ navigation, route }) => {
         {/* Payment Status */}
         <View style={styles.inputContainer}>
           <Text style={styles.inputLabel}>Payment Status</Text>
-          <TouchableOpacity
-            style={styles.dropdown}
-            onPress={() => setShowPaymentStatusModal(true)}
-          >
-            <Text style={styles.dropdownText}>
-              {PAYMENT_STATUS_OPTIONS.find(
+          <SimpleDropdown
+            value={
+              PAYMENT_STATUS_OPTIONS.find(
                 option => option.value === formData.payment_status,
-              )?.label || 'Select Status'}
-            </Text>
-            <Ionicons name="chevron-down" size={20} color={colors.gray} />
-          </TouchableOpacity>
+              )?.label
+            }
+            placeholder="Select Status"
+            data={PAYMENT_STATUS_OPTIONS}
+            onSelect={selectPaymentStatus}
+            isOpen={showPaymentStatusDropdown}
+            onToggle={() =>
+              setShowPaymentStatusDropdown(!showPaymentStatusDropdown)
+            }
+          />
         </View>
 
         {/* Payment Details */}
@@ -581,42 +645,6 @@ const EditBookingScreen = ({ navigation, route }) => {
           )}
         </TouchableOpacity>
       </ScrollView>
-
-      {/* Payment Status Modal */}
-      <Modal
-        visible={showPaymentStatusModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowPaymentStatusModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Payment Status</Text>
-              <TouchableOpacity
-                onPress={() => setShowPaymentStatusModal(false)}
-              >
-                <Ionicons name="close" size={24} color={colors.gray} />
-              </TouchableOpacity>
-            </View>
-            {PAYMENT_STATUS_OPTIONS.map(option => (
-              <TouchableOpacity
-                key={option.value}
-                style={styles.modalOption}
-                onPress={() => {
-                  handleInputChange('payment_status', option.value);
-                  setShowPaymentStatusModal(false);
-                }}
-              >
-                <Text style={styles.modalOptionText}>{option.label}</Text>
-                {formData.payment_status === option.value && (
-                  <Ionicons name="checkmark" size={20} color={colors.primary} />
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      </Modal>
 
       {/* Date Picker */}
       {showDatePicker && (
@@ -916,6 +944,69 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.gray,
+  },
+  // SimpleDropdown styles
+  dropdownWrapper: {
+    position: 'relative',
+    zIndex: 1000,
+  },
+  dropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: colors.background,
+  },
+  placeholder: {
+    color: colors.gray,
+    fontSize: 16,
+  },
+  inputText: {
+    color: colors.secondary,
+    fontSize: 16,
+    flex: 1,
+  },
+  dropdownList: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+    maxHeight: 200,
+    zIndex: 1001,
+    elevation: 5,
+    shadowColor: colors.secondary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  dropdownScrollView: {
+    maxHeight: 200,
+  },
+  dropdownItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  dropdownItemLast: {
+    borderBottomWidth: 0,
+  },
+  dropdownItemText: {
+    fontSize: 16,
+    color: colors.secondary,
+  },
+  inputError: {
+    borderColor: colors.error,
   },
   dateTimePicker: {
     backgroundColor: colors.background,
