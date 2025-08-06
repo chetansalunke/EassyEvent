@@ -18,11 +18,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { colors } from '../utils/colors';
 import { useAuth } from '../context/AuthContext';
-import { getEventStatistics, getVenueDetails } from '../utils/authUtils';
+import { getVenueDetails } from '../utils/authUtils';
 
-// Import axios or fetch for direct API call if not already in utils
-import axios from 'axios';
-import { API_BASE_URL } from '../config/apiConfig';
+// Import API configuration
+import API_CONFIG from '../config/apiConfig';
 
 const { width, height } = Dimensions.get('window');
 
@@ -40,28 +39,30 @@ const HomeScreen = ({ navigation }) => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [dashboardStats, setDashboardStats] = useState(null);
   const [venueDetails, setVenueDetails] = useState(null);
-  const [bookingStats, setBookingStats] = useState(null); // New state for booking stats
+  const [bookingStats, setBookingStats] = useState(null); // State for booking stats
+  const [statsLoading, setStatsLoading] = useState(false); // Loading state for stats
   const [eventDetails, setEventDetails] = useState(null); // State for event details
   // Fetch event details from API (for event id 1)
   const fetchEventDetails = async () => {
     if (!token) return;
     try {
-      const response = await axios.get(
-        'https://easeevent.echogen.online/events/get/1',
+      const response = await fetch(
+        `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.EVENTS_GET}1`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: {
+            ...API_CONFIG.getHeaders(token),
+          },
         },
       );
-      if (response.data) {
-        setEventDetails(response.data);
+      if (response.ok) {
+        const data = await response.json();
+        setEventDetails(data);
+      } else {
+        console.warn('Failed to fetch event details:', response.status);
       }
     } catch (error) {
-      console.warn(
-        'Failed to fetch event details:',
-        error?.response?.data || error.message,
-      );
+      console.warn('Failed to fetch event details:', error?.message || error);
     }
   };
   const { user, logout, isAuthenticated, token } = useAuth();
@@ -70,25 +71,102 @@ const HomeScreen = ({ navigation }) => {
     console.log('Auth token:', token);
   }, [token]);
 
-  // Fetch booking stats from API (updated to use provided endpoint)
+  // Fetch dashboard statistics from API using proper fetch logic
   const fetchBookingStats = async () => {
-    if (!token) return;
-    try {
-      const response = await axios.get(
-        'https://easeevent.echogen.online/events/stats/get/',
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-      if (response.data) {
-        setBookingStats(response.data);
-      }
-    } catch (error) {
-      console.warn(
-        'Failed to fetch booking stats:',
-        error?.response?.data || error.message,
-      );
+    if (!token) {
+      console.warn('No token available for booking stats request');
+      return;
     }
+
+    setStatsLoading(true);
+
+    // List of possible API endpoints to try
+    const endpoints = [
+      `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.EVENTS_STATS}`,
+      `${API_CONFIG.BASE_URL}/dashboard/stats`,
+      `${API_CONFIG.BASE_URL}/events/stats/get/`,
+    ];
+
+    for (let i = 0; i < endpoints.length; i++) {
+      const endpoint = endpoints[i];
+
+      try {
+        console.log(`Trying endpoint ${i + 1}/${endpoints.length}:`, endpoint);
+        console.log('Using token:', token.substring(0, 20) + '...');
+
+        // Try both Token and Bearer authentication headers
+        const authHeaders = [
+          { Authorization: `Token ${token}` },
+          { Authorization: `Bearer ${token}` },
+        ];
+
+        for (const authHeader of authHeaders) {
+          console.log(
+            'Trying auth header:',
+            Object.keys(authHeader)[0],
+            Object.values(authHeader)[0].substring(0, 20) + '...',
+          );
+
+          const response = await fetch(endpoint, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+              ...authHeader,
+            },
+            timeout: API_CONFIG.TIMEOUT,
+          });
+
+          console.log('Response status:', response.status);
+
+          if (response.ok) {
+            const result = await response.json();
+            console.log('Booking stats response:', result);
+
+            // Check if result has the expected structure
+            if (result && typeof result === 'object') {
+              // Set the booking stats even if some fields are missing
+              setBookingStats({
+                bookings_this_month: result.bookings_this_month ?? 0,
+                fully_paid_bookings: result.fully_paid_bookings ?? 0,
+                partially_paid_bookings: result.partially_paid_bookings ?? 0,
+                available_dates_left: result.available_dates_left ?? 0,
+              });
+              console.log('Booking stats set successfully from:', endpoint);
+              setStatsLoading(false);
+              return; // Success, exit the function
+            }
+          } else {
+            const errorText = await response.text();
+            console.error(
+              `Auth header failed for ${endpoint}:`,
+              response.status,
+              errorText,
+            );
+          }
+        }
+
+        // If we get here, both auth headers failed for this endpoint
+        console.error(`All auth methods failed for endpoint: ${endpoint}`);
+      } catch (error) {
+        console.error(`Error with endpoint ${endpoint}:`, error.message);
+      }
+    }
+
+    // If all endpoints failed
+    console.error(
+      'All endpoints and auth methods failed. Setting default values.',
+    );
+
+    // Set default values on final error
+    setBookingStats({
+      bookings_this_month: 0,
+      fully_paid_bookings: 0,
+      partially_paid_bookings: 0,
+      available_dates_left: 0,
+    });
+
+    setStatsLoading(false);
   };
   // Auth protection - redirect to login if not authenticated
   useEffect(() => {
@@ -125,24 +203,15 @@ const HomeScreen = ({ navigation }) => {
     return () => backHandler.remove();
   }, []);
 
-  // Load dashboard data
-  const loadDashboardData = async () => {
+  // Load venue details data
+  const loadVenueData = async () => {
     if (!token) return;
 
     try {
       setIsLoading(true);
 
-      // Load statistics and venue details in parallel
-      const [statsResult, venueResult] = await Promise.all([
-        getEventStatistics(token),
-        getVenueDetails(token),
-      ]);
-
-      if (statsResult.success) {
-        setDashboardStats(statsResult.data);
-      } else {
-        console.warn('Failed to load statistics:', statsResult.error);
-      }
+      // Load venue details
+      const venueResult = await getVenueDetails(token);
 
       if (venueResult.success) {
         setVenueDetails(venueResult.data);
@@ -150,7 +219,7 @@ const HomeScreen = ({ navigation }) => {
         console.warn('Failed to load venue details:', venueResult.error);
       }
     } catch (error) {
-      console.error('Error loading dashboard data:', error);
+      console.error('Error loading venue data:', error);
     } finally {
       setIsLoading(false);
     }
@@ -159,7 +228,7 @@ const HomeScreen = ({ navigation }) => {
   // Load data on component mount
   useEffect(() => {
     if (isAuthenticated && token) {
-      loadDashboardData();
+      loadVenueData();
       fetchBookingStats();
       fetchEventDetails();
     }
@@ -169,7 +238,7 @@ const HomeScreen = ({ navigation }) => {
   const onRefresh = async () => {
     setIsRefreshing(true);
     await Promise.all([
-      loadDashboardData(),
+      loadVenueData(),
       fetchBookingStats(),
       fetchEventDetails(),
     ]);
@@ -243,71 +312,8 @@ const HomeScreen = ({ navigation }) => {
     },
   ];
 
-  // Dashboard stats configuration
-  const getStatsConfig = () => {
-    if (!dashboardStats) {
-      return [
-        {
-          title: 'Total Events',
-          number: '--',
-          icon: 'calendar-outline',
-          color: colors.primary,
-        },
-        {
-          title: 'This Month',
-          number: '--',
-          icon: 'trending-up-outline',
-          color: colors.success,
-        },
-        {
-          title: 'Revenue',
-          number: '--',
-          icon: 'cash-outline',
-          color: colors.warning,
-        },
-        {
-          title: 'Bookings',
-          number: '--',
-          icon: 'bookmark-outline',
-          color: colors.info,
-        },
-      ];
-    }
-
-    return [
-      {
-        title: 'Total Events',
-        number: dashboardStats.total_events || 0,
-        icon: 'calendar-outline',
-        color: colors.primary,
-        subtitle: 'All time events',
-      },
-      {
-        title: 'This Month',
-        number: dashboardStats.events_this_month || 0,
-        icon: 'trending-up-outline',
-        color: colors.success,
-        subtitle: 'Events this month',
-      },
-      {
-        title: 'Revenue',
-        number: `₹${(dashboardStats.total_revenue || 0).toLocaleString()}`,
-        icon: 'cash-outline',
-        color: colors.warning,
-        subtitle: 'Total earned',
-      },
-      {
-        title: 'Pending',
-        number: dashboardStats.pending_payments || 0,
-        icon: 'time-outline',
-        color: colors.error,
-        subtitle: 'Pending payments',
-      },
-    ];
-  };
-
   // Render loading state
-  if (isLoading && !dashboardStats) {
+  if (isLoading) {
     return (
       <View
         style={[
@@ -441,79 +447,135 @@ const HomeScreen = ({ navigation }) => {
               </View>
             </View>
           )}
-          {/* Statistics Cards */}
-          <View style={styles.statsContainer}>
-            {getStatsConfig().map((stat, index) => (
-              <View key={index} style={styles.statCard}>
-                <View style={styles.statHeader}>
-                  <Ionicons name={stat.icon} size={24} color={stat.color} />
-                  <Text
-                    style={styles.statTitle}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                  >
-                    {stat.title}
-                  </Text>
-                </View>
-                <Text
-                  style={styles.statNumber}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                >
-                  {stat.number}
+          {/* Dashboard Statistics Section - API Data Only */}
+          <View style={styles.bookingStatsSection}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="stats-chart" size={20} color={colors.primary} />
+              <Text style={styles.sectionTitle}>Dashboard Statistics</Text>
+            </View>
+
+            {statsLoading ? (
+              <View style={styles.statsLoadingContainer}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={styles.statsLoadingText}>
+                  Loading statistics...
                 </Text>
-                {stat.subtitle && (
-                  <Text style={styles.statSubtitle} numberOfLines={2}>
-                    {stat.subtitle}
-                  </Text>
-                )}
               </View>
-            ))}
-          </View>
-          {/* Booking Stats Section */}
-          {bookingStats && (
-            <View style={styles.bookingStatsSection}>
-              <Text style={styles.sectionTitle}>Booking Stats</Text>
+            ) : bookingStats ? (
               <View style={styles.bookingStatsGrid}>
                 <View style={styles.bookingStatCard}>
+                  <Ionicons name="calendar" size={20} color={colors.success} />
                   <Text style={styles.bookingStatLabel}>
                     Bookings This Month
                   </Text>
                   <Text style={styles.bookingStatValue}>
-                    {bookingStats.bookings_this_month ?? '--'}
+                    {bookingStats.bookings_this_month ?? 0}
                   </Text>
                 </View>
                 <View style={styles.bookingStatCard}>
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={20}
+                    color={colors.primary}
+                  />
                   <Text style={styles.bookingStatLabel}>
                     Fully Paid Bookings
                   </Text>
                   <Text style={styles.bookingStatValue}>
-                    {bookingStats.fully_paid_bookings ?? '--'}
+                    {bookingStats.fully_paid_bookings ?? 0}
                   </Text>
                 </View>
                 <View style={styles.bookingStatCard}>
+                  <Ionicons name="time" size={20} color={colors.warning} />
                   <Text style={styles.bookingStatLabel}>
                     Partially Paid Bookings
                   </Text>
                   <Text style={styles.bookingStatValue}>
-                    {bookingStats.partially_paid_bookings ?? '--'}
+                    {bookingStats.partially_paid_bookings ?? 0}
                   </Text>
                 </View>
                 <View style={styles.bookingStatCard}>
+                  <Ionicons
+                    name="calendar-outline"
+                    size={20}
+                    color={colors.info}
+                  />
                   <Text style={styles.bookingStatLabel}>
                     Available Dates Left
                   </Text>
                   <Text style={styles.bookingStatValue}>
-                    {bookingStats.available_dates_left ?? '--'}
+                    {bookingStats.available_dates_left ?? 0}
                   </Text>
                 </View>
               </View>
-            </View>
-          )}
+            ) : (
+              <View style={styles.statsEmptyContainer}>
+                <Ionicons
+                  name="analytics-outline"
+                  size={32}
+                  color={colors.gray}
+                />
+                <Text style={styles.statsEmptyText}>
+                  Unable to load statistics
+                </Text>
+                <Text style={styles.statsEmptySubtext}>
+                  Check your internet connection and try again
+                </Text>
+                <TouchableOpacity
+                  style={styles.retryButton}
+                  onPress={fetchBookingStats}
+                >
+                  <Text style={styles.retryButtonText}>Retry</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.retryButton,
+                    { marginTop: 8, backgroundColor: colors.info },
+                  ]}
+                  onPress={async () => {
+                    console.log('=== API DEBUG INFO ===');
+                    console.log('Token exists:', !!token);
+                    console.log('Token length:', token ? token.length : 0);
+                    console.log('Base URL:', API_CONFIG.BASE_URL);
+                    console.log(
+                      'Stats endpoint:',
+                      `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.EVENTS_STATS}`,
+                    );
+                    console.log('Is authenticated:', isAuthenticated);
+                    console.log('User:', user);
+
+                    // Test a simple API call
+                    try {
+                      const testResponse = await fetch(
+                        `${API_CONFIG.BASE_URL}/venue/get/`,
+                        {
+                          headers: API_CONFIG.getHeaders(token),
+                        },
+                      );
+                      console.log('Test API call status:', testResponse.status);
+                      console.log(
+                        'Test API call headers work:',
+                        testResponse.ok,
+                      );
+                    } catch (error) {
+                      console.log('Test API call failed:', error.message);
+                    }
+
+                    Alert.alert(
+                      'Debug',
+                      'Check console logs for API debug info',
+                    );
+                  }}
+                >
+                  <Text style={styles.retryButtonText}>Debug API</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
           {/* Event Details Section */}
           {eventDetails && (
             <View style={styles.eventDetailsSection}>
-              <Text style={styles.sectionTitle}>Event Details</Text>
+              <Text style={styles.quickActionsSectionTitle}>Event Details</Text>
               <View style={styles.eventDetailsGrid}>
                 <Text style={styles.eventDetailLabel}>Name:</Text>
                 <Text style={styles.eventDetailValue}>{eventDetails.name}</Text>
@@ -546,7 +608,7 @@ const HomeScreen = ({ navigation }) => {
           )}
           {/* Quick Actions */}
           <View style={styles.quickActionsSection}>
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
+            <Text style={styles.quickActionsSectionTitle}>Quick Actions</Text>
             <View style={styles.quickActionsGrid}>
               <TouchableOpacity
                 style={styles.quickActionCard}
@@ -696,32 +758,86 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 2,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.secondary,
+    marginLeft: 8,
+    flex: 1,
+  },
   bookingStatsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginTop: 8,
   },
   bookingStatCard: {
     width: '48%',
     backgroundColor: colors.lightGray,
     borderRadius: 10,
-    padding: 12,
+    padding: 16,
     marginBottom: 12,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.border,
+    minHeight: 100,
+  },
+  statsLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+  },
+  statsLoadingText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: colors.gray,
+  },
+  statsEmptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+  },
+  statsEmptyText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: colors.gray,
+    textAlign: 'center',
+  },
+  statsEmptySubtext: {
+    marginTop: 4,
+    fontSize: 12,
+    color: colors.gray,
+    textAlign: 'center',
+    opacity: 0.8,
+  },
+  retryButton: {
+    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: colors.primary,
+    borderRadius: 6,
+  },
+  retryButtonText: {
+    color: colors.background,
+    fontSize: 12,
+    fontWeight: '600',
   },
   bookingStatLabel: {
-    fontSize: 13,
+    fontSize: 12,
     color: colors.secondary,
-    marginBottom: 4,
+    marginVertical: 6,
     fontWeight: '500',
     textAlign: 'center',
+    lineHeight: 16,
   },
 
   bookingStatValue: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: colors.primary,
     textAlign: 'center',
@@ -886,6 +1002,48 @@ const styles = StyleSheet.create({
     paddingTop: 8, // Add some top padding for better spacing
   },
 
+  // Quick Actions
+  quickActionsSection: {
+    marginBottom: 20,
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  quickActionCard: {
+    width: (width - 60) / 2,
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    alignItems: 'center',
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  quickActionText: {
+    fontSize: 12,
+    color: colors.secondary,
+    marginTop: 8,
+    textAlign: 'center',
+    fontWeight: '500',
+    lineHeight: 16,
+    minHeight: 32, // Ensure consistent height for text
+    maxWidth: '100%', // Ensure text doesn't overflow
+  },
+
+  quickActionsSectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.secondary,
+    marginBottom: 16,
+  },
+
   // Venue Card Styles
   venueCard: {
     backgroundColor: colors.background,
@@ -927,54 +1085,6 @@ const styles = StyleSheet.create({
     color: colors.secondary,
   },
 
-  // Stats Container
-  statsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-  },
-  statCard: {
-    width: (width - 60) / 2,
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  statHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    flex: 1,
-  },
-  statTitle: {
-    fontSize: 12,
-    color: colors.gray,
-    marginLeft: 8,
-    fontWeight: '500',
-    flex: 1,
-    flexWrap: 'wrap',
-  },
-  statNumber: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.secondary,
-    marginBottom: 4,
-    flexWrap: 'wrap',
-  },
-  statSubtitle: {
-    fontSize: 10,
-    color: colors.gray,
-    lineHeight: 14,
-  },
-
   // Quick Actions
   quickActionsSection: {
     marginBottom: 20,
@@ -1010,7 +1120,7 @@ const styles = StyleSheet.create({
     maxWidth: '100%', // Ensure text doesn't overflow
   },
 
-  sectionTitle: {
+  quickActionsSectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: colors.secondary,
