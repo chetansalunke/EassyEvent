@@ -12,7 +12,10 @@ import {
   FlatList,
   TextInput,
   Modal,
+  StatusBar,
+  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { colors } from '../utils/colors';
 import { useAuth } from '../context/AuthContext';
@@ -22,6 +25,7 @@ import { Calendar } from 'react-native-calendars';
 import { PAYMENT_STATUS_OPTIONS } from '../services/eventsApi';
 
 const EventsScreen = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [events, setEvents] = useState([]);
@@ -308,11 +312,70 @@ const EventsScreen = ({ navigation }) => {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
+        <StatusBar
+          barStyle="dark-content"
+          backgroundColor={colors.background}
+        />
+        <SafeAreaView style={[styles.safeArea, { paddingTop: insets.top }]}>
+          <View style={styles.header}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="arrow-back" size={24} color={colors.secondary} />
+            </TouchableOpacity>
+            <View style={styles.headerContent}>
+              <Text style={styles.headerTitle}>Events</Text>
+              <Text style={styles.headerSubtitle}>
+                Manage your venue bookings
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => navigation.navigate('EditBooking')}
+              hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+            >
+              <Ionicons name="add" size={24} color={colors.background} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.filterButton}
+              onPress={() => setShowFilters(true)}
+              hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+            >
+              <Ionicons name="filter" size={20} color={colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.viewToggleButton}
+              onPress={handleViewToggle}
+              hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+            >
+              <Ionicons
+                name={currentView === 'calendar' ? 'list' : 'calendar'}
+                size={20}
+                color={colors.primary}
+              />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Loading events...</Text>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <SafeAreaView style={[styles.safeArea, { paddingTop: insets.top }]}>
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Ionicons name="arrow-back" size={24} color={colors.secondary} />
           </TouchableOpacity>
@@ -325,18 +388,21 @@ const EventsScreen = ({ navigation }) => {
           <TouchableOpacity
             style={styles.addButton}
             onPress={() => navigation.navigate('EditBooking')}
+            hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
           >
             <Ionicons name="add" size={24} color={colors.background} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.filterButton}
             onPress={() => setShowFilters(true)}
+            hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
           >
             <Ionicons name="filter" size={20} color={colors.primary} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.viewToggleButton}
             onPress={handleViewToggle}
+            hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
           >
             <Ionicons
               name={currentView === 'calendar' ? 'list' : 'calendar'}
@@ -345,108 +411,171 @@ const EventsScreen = ({ navigation }) => {
             />
           </TouchableOpacity>
         </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading events...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color={colors.secondary} />
-        </TouchableOpacity>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Events</Text>
-          <Text style={styles.headerSubtitle}>Manage your venue bookings</Text>
-        </View>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => navigation.navigate('EditBooking')}
-        >
-          <Ionicons name="add" size={24} color={colors.background} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.filterButton}
-          onPress={() => setShowFilters(true)}
-        >
-          <Ionicons name="filter" size={20} color={colors.primary} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.viewToggleButton}
-          onPress={handleViewToggle}
-        >
-          <Ionicons
-            name={currentView === 'calendar' ? 'list' : 'calendar'}
-            size={20}
-            color={colors.primary}
-          />
-        </TouchableOpacity>
-      </View>
-      {currentView === 'calendar' ? (
-        <ScrollView
-          style={styles.content}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={onRefresh}
-              colors={[colors.primary]}
-              tintColor={colors.primary}
+        {currentView === 'calendar' ? (
+          <ScrollView
+            style={styles.content}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={onRefresh}
+                colors={[colors.primary]}
+                tintColor={colors.primary}
+              />
+            }
+          >
+            <Calendar
+              style={{ borderRadius: 12, marginBottom: 16 }}
+              markingType={'custom'}
+              markedDates={{
+                ...markedDates,
+                ...(selectedDate
+                  ? {
+                      [selectedDate]: {
+                        ...(markedDates[selectedDate] || {}),
+                        selected: true,
+                        selectedColor: colors.primary,
+                      },
+                    }
+                  : {}),
+              }}
+              onDayPress={handleDayPress}
+              theme={{
+                backgroundColor: colors.background,
+                calendarBackground: colors.background,
+                textSectionTitleColor: colors.secondary,
+                selectedDayBackgroundColor: colors.primary,
+                selectedDayTextColor: colors.background,
+                todayTextColor: colors.primary,
+                dayTextColor: colors.secondary,
+                textDisabledColor: colors.gray,
+                dotColor: colors.primary,
+                arrowColor: colors.primary,
+                monthTextColor: colors.secondary,
+                indicatorColor: colors.primary,
+              }}
             />
-          }
-        >
-          <Calendar
-            style={{ borderRadius: 12, marginBottom: 16 }}
-            markingType={'custom'}
-            markedDates={{
-              ...markedDates,
-              ...(selectedDate
-                ? {
-                    [selectedDate]: {
-                      ...(markedDates[selectedDate] || {}),
-                      selected: true,
-                      selectedColor: colors.primary,
-                    },
-                  }
-                : {}),
-            }}
-            onDayPress={handleDayPress}
-            theme={{
-              backgroundColor: colors.background,
-              calendarBackground: colors.background,
-              textSectionTitleColor: colors.secondary,
-              selectedDayBackgroundColor: colors.primary,
-              selectedDayTextColor: colors.background,
-              todayTextColor: colors.primary,
-              dayTextColor: colors.secondary,
-              textDisabledColor: colors.gray,
-              dotColor: colors.primary,
-              arrowColor: colors.primary,
-              monthTextColor: colors.secondary,
-              indicatorColor: colors.primary,
-            }}
-          />
-          {/* Show event details for selected date */}
-          {selectedDateEvents.length > 0 ? (
-            <View>
-              <Text style={styles.selectedDateTitle}>
-                Events on {formatDate(selectedDate)} (
-                {selectedDateEvents.length})
-              </Text>
-              {selectedDateEvents.map(event => (
+            {/* Show event details for selected date */}
+            {selectedDateEvents.length > 0 ? (
+              <View>
+                <Text style={styles.selectedDateTitle}>
+                  Events on {formatDate(selectedDate)} (
+                  {selectedDateEvents.length})
+                </Text>
+                {selectedDateEvents.map(event => (
+                  <TouchableOpacity
+                    key={event.id}
+                    style={styles.eventCard}
+                    onPress={() => handleEventPress(event)}
+                  >
+                    <View style={styles.eventHeader}>
+                      <Text style={styles.eventName} numberOfLines={2}>
+                        {event.name}
+                      </Text>
+                      <View style={styles.eventActions}>
+                        <TouchableOpacity
+                          style={styles.actionButton}
+                          onPress={() => handleEditEvent(event)}
+                        >
+                          <Ionicons
+                            name="pencil"
+                            size={20}
+                            color={colors.primary}
+                          />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.actionButton}
+                          onPress={() => handleDeleteEvent(event)}
+                        >
+                          <Ionicons
+                            name="trash"
+                            size={20}
+                            color={colors.error}
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                    <View style={styles.eventSummary}>
+                      <Text style={styles.eventSummaryText}>
+                        {formatDate(event.from_date)} -{' '}
+                        {formatDate(event.to_date)}
+                      </Text>
+                      <Text style={styles.eventSummaryText}>
+                        {event.number_of_people || 0} people • ₹
+                        {(event.amount_received || 0).toLocaleString()}
+                      </Text>
+                    </View>
+                    <View style={styles.eventFooter}>
+                      <View
+                        style={[
+                          styles.paymentStatusBadge,
+                          {
+                            backgroundColor:
+                              getPaymentStatusColor(event.payment_status) +
+                              '20',
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.paymentStatusText,
+                            {
+                              color: getPaymentStatusColor(
+                                event.payment_status,
+                              ),
+                            },
+                          ]}
+                        >
+                          {getPaymentStatusLabel(event.payment_status)}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons
+                  name="calendar-outline"
+                  size={64}
+                  color={colors.gray}
+                />
+                <Text style={styles.emptyTitle}>
+                  {selectedDate ? 'No events on this date' : 'Select a date'}
+                </Text>
+                <Text style={styles.emptySubtitle}>
+                  {selectedDate
+                    ? 'There are no bookings scheduled for this date'
+                    : 'Tap a highlighted date to view event details'}
+                </Text>
+              </View>
+            )}
+          </ScrollView>
+        ) : (
+          // List View - Use FlatList directly without ScrollView wrapper
+          <View style={styles.listView}>
+            <View style={styles.listHeader}>
+              <Text style={styles.listTitle}>All Events ({events.length})</Text>
+            </View>
+            <FlatList
+              data={events}
+              keyExtractor={item => item.id.toString()}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.listContent}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefreshing}
+                  onRefresh={onRefresh}
+                  colors={[colors.primary]}
+                  tintColor={colors.primary}
+                />
+              }
+              renderItem={({ item: event }) => (
                 <TouchableOpacity
-                  key={event.id}
-                  style={styles.eventCard}
+                  style={styles.eventListCard}
                   onPress={() => handleEventPress(event)}
                 >
                   <View style={styles.eventHeader}>
-                    <Text style={styles.eventName} numberOfLines={2}>
+                    <Text style={styles.eventName} numberOfLines={1}>
                       {event.name}
                     </Text>
                     <View style={styles.eventActions}>
@@ -456,7 +585,7 @@ const EventsScreen = ({ navigation }) => {
                       >
                         <Ionicons
                           name="pencil"
-                          size={20}
+                          size={18}
                           color={colors.primary}
                         />
                       </TouchableOpacity>
@@ -464,20 +593,33 @@ const EventsScreen = ({ navigation }) => {
                         style={styles.actionButton}
                         onPress={() => handleDeleteEvent(event)}
                       >
-                        <Ionicons name="trash" size={20} color={colors.error} />
+                        <Ionicons name="trash" size={18} color={colors.error} />
                       </TouchableOpacity>
                     </View>
                   </View>
-                  <View style={styles.eventSummary}>
-                    <Text style={styles.eventSummaryText}>
-                      {formatDate(event.from_date)} -{' '}
-                      {formatDate(event.to_date)}
-                    </Text>
-                    <Text style={styles.eventSummaryText}>
-                      {event.number_of_people || 0} people • ₹
-                      {(event.amount_received || 0).toLocaleString()}
-                    </Text>
+
+                  <View style={styles.eventListDetails}>
+                    <View style={styles.eventListRow}>
+                      <Ionicons name="calendar" size={14} color={colors.gray} />
+                      <Text style={styles.eventListText}>
+                        {formatDate(event.from_date)} -{' '}
+                        {formatDate(event.to_date)}
+                      </Text>
+                    </View>
+                    <View style={styles.eventListRow}>
+                      <Ionicons name="people" size={14} color={colors.gray} />
+                      <Text style={styles.eventListText}>
+                        {event.number_of_people || 0} people
+                      </Text>
+                    </View>
+                    <View style={styles.eventListRow}>
+                      <Ionicons name="cash" size={14} color={colors.gray} />
+                      <Text style={styles.eventListText}>
+                        ₹{(event.amount_received || 0).toLocaleString()}
+                      </Text>
+                    </View>
                   </View>
+
                   <View style={styles.eventFooter}>
                     <View
                       style={[
@@ -499,383 +641,305 @@ const EventsScreen = ({ navigation }) => {
                         {getPaymentStatusLabel(event.payment_status)}
                       </Text>
                     </View>
+                    <Ionicons
+                      name="chevron-forward"
+                      size={16}
+                      color={colors.gray}
+                    />
                   </View>
                 </TouchableOpacity>
-              ))}
-            </View>
-          ) : (
-            <View style={styles.emptyState}>
-              <Ionicons name="calendar-outline" size={64} color={colors.gray} />
-              <Text style={styles.emptyTitle}>
-                {selectedDate ? 'No events on this date' : 'Select a date'}
-              </Text>
-              <Text style={styles.emptySubtitle}>
-                {selectedDate
-                  ? 'There are no bookings scheduled for this date'
-                  : 'Tap a highlighted date to view event details'}
-              </Text>
-            </View>
-          )}
-        </ScrollView>
-      ) : (
-        // List View - Use FlatList directly without ScrollView wrapper
-        <View style={styles.listView}>
-          <View style={styles.listHeader}>
-            <Text style={styles.listTitle}>All Events ({events.length})</Text>
-          </View>
-          <FlatList
-            data={events}
-            keyExtractor={item => item.id.toString()}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.listContent}
-            refreshControl={
-              <RefreshControl
-                refreshing={isRefreshing}
-                onRefresh={onRefresh}
-                colors={[colors.primary]}
-                tintColor={colors.primary}
-              />
-            }
-            renderItem={({ item: event }) => (
-              <TouchableOpacity
-                style={styles.eventListCard}
-                onPress={() => handleEventPress(event)}
-              >
-                <View style={styles.eventHeader}>
-                  <Text style={styles.eventName} numberOfLines={1}>
-                    {event.name}
+              )}
+              ListEmptyComponent={() => (
+                <View style={styles.emptyState}>
+                  <Ionicons name="list-outline" size={64} color={colors.gray} />
+                  <Text style={styles.emptyTitle}>No events found</Text>
+                  <Text style={styles.emptySubtitle}>
+                    Try adjusting your filters or create a new event
                   </Text>
-                  <View style={styles.eventActions}>
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={() => handleEditEvent(event)}
-                    >
-                      <Ionicons
-                        name="pencil"
-                        size={18}
-                        color={colors.primary}
-                      />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={() => handleDeleteEvent(event)}
-                    >
-                      <Ionicons name="trash" size={18} color={colors.error} />
-                    </TouchableOpacity>
-                  </View>
                 </View>
-
-                <View style={styles.eventListDetails}>
-                  <View style={styles.eventListRow}>
-                    <Ionicons name="calendar" size={14} color={colors.gray} />
-                    <Text style={styles.eventListText}>
-                      {formatDate(event.from_date)} -{' '}
-                      {formatDate(event.to_date)}
-                    </Text>
-                  </View>
-                  <View style={styles.eventListRow}>
-                    <Ionicons name="people" size={14} color={colors.gray} />
-                    <Text style={styles.eventListText}>
-                      {event.number_of_people || 0} people
-                    </Text>
-                  </View>
-                  <View style={styles.eventListRow}>
-                    <Ionicons name="cash" size={14} color={colors.gray} />
-                    <Text style={styles.eventListText}>
-                      ₹{(event.amount_received || 0).toLocaleString()}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.eventFooter}>
-                  <View
-                    style={[
-                      styles.paymentStatusBadge,
-                      {
-                        backgroundColor:
-                          getPaymentStatusColor(event.payment_status) + '20',
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.paymentStatusText,
-                        {
-                          color: getPaymentStatusColor(event.payment_status),
-                        },
-                      ]}
-                    >
-                      {getPaymentStatusLabel(event.payment_status)}
-                    </Text>
-                  </View>
-                  <Ionicons
-                    name="chevron-forward"
-                    size={16}
-                    color={colors.gray}
-                  />
-                </View>
-              </TouchableOpacity>
-            )}
-            ListEmptyComponent={() => (
-              <View style={styles.emptyState}>
-                <Ionicons name="list-outline" size={64} color={colors.gray} />
-                <Text style={styles.emptyTitle}>No events found</Text>
-                <Text style={styles.emptySubtitle}>
-                  Try adjusting your filters or create a new event
-                </Text>
-              </View>
-            )}
-          />
-        </View>
-      )}
-
-      {/* Event Detail Modal */}
-      <Modal
-        visible={showEventDetail}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowEventDetail(false)}
-      >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowEventDetail(false)}>
-              <Text style={styles.modalCancelText}>Close</Text>
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Event Details</Text>
-            <TouchableOpacity
-              onPress={() => {
-                setShowEventDetail(false);
-                if (selectedEvent) {
-                  handleEditEvent(selectedEvent);
-                }
-              }}
-            >
-              <Text style={styles.modalApplyText}>Edit</Text>
-            </TouchableOpacity>
+              )}
+            />
           </View>
+        )}
 
-          {selectedEvent && (
-            <ScrollView style={styles.modalContent}>
-              <View style={styles.detailSection}>
-                <Text style={styles.detailEventName}>{selectedEvent.name}</Text>
+        {/* Event Detail Modal */}
+        <Modal
+          visible={showEventDetail}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowEventDetail(false)}
+        >
+          <SafeAreaView style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => setShowEventDetail(false)}>
+                <Text style={styles.modalCancelText}>Close</Text>
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>Event Details</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowEventDetail(false);
+                  if (selectedEvent) {
+                    handleEditEvent(selectedEvent);
+                  }
+                }}
+              >
+                <Text style={styles.modalApplyText}>Edit</Text>
+              </TouchableOpacity>
+            </View>
 
-                <View style={styles.detailRow}>
-                  <Ionicons name="calendar" size={20} color={colors.primary} />
-                  <View style={styles.detailTextContainer}>
-                    <Text style={styles.detailLabel}>Date & Time</Text>
-                    <Text style={styles.detailValue}>
-                      From: {formatDate(selectedEvent.from_date)} at{' '}
-                      {formatTime(selectedEvent.from_time)}
-                    </Text>
-                    <Text style={styles.detailValue}>
-                      To: {formatDate(selectedEvent.to_date)} at{' '}
-                      {formatTime(selectedEvent.to_time)}
-                    </Text>
-                  </View>
-                </View>
+            {selectedEvent && (
+              <ScrollView style={styles.modalContent}>
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailEventName}>
+                    {selectedEvent.name}
+                  </Text>
 
-                <View style={styles.detailRow}>
-                  <Ionicons name="people" size={20} color={colors.primary} />
-                  <View style={styles.detailTextContainer}>
-                    <Text style={styles.detailLabel}>Number of People</Text>
-                    <Text style={styles.detailValue}>
-                      {selectedEvent.number_of_people || 0} guests
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.detailRow}>
-                  <Ionicons name="cash" size={20} color={colors.primary} />
-                  <View style={styles.detailTextContainer}>
-                    <Text style={styles.detailLabel}>Payment Information</Text>
-                    <Text style={styles.detailValue}>
-                      Amount Received: ₹
-                      {(selectedEvent.amount_received || 0).toLocaleString()}
-                    </Text>
-                    {selectedEvent.amount_pending > 0 && (
-                      <Text
-                        style={[styles.detailValue, { color: colors.warning }]}
-                      >
-                        Amount Pending: ₹
-                        {selectedEvent.amount_pending.toLocaleString()}
-                      </Text>
-                    )}
-                  </View>
-                </View>
-
-                <View style={styles.detailRow}>
-                  <Ionicons name="card" size={20} color={colors.primary} />
-                  <View style={styles.detailTextContainer}>
-                    <Text style={styles.detailLabel}>Payment Status</Text>
-                    <View
-                      style={[
-                        styles.paymentStatusBadge,
-                        styles.detailStatusBadge,
-                        {
-                          backgroundColor:
-                            getPaymentStatusColor(
-                              selectedEvent.payment_status,
-                            ) + '20',
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.paymentStatusText,
-                          styles.detailStatusText,
-                          {
-                            color: getPaymentStatusColor(
-                              selectedEvent.payment_status,
-                            ),
-                          },
-                        ]}
-                      >
-                        {getPaymentStatusLabel(selectedEvent.payment_status)}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                <View style={styles.detailRow}>
-                  <Ionicons name="time" size={20} color={colors.primary} />
-                  <View style={styles.detailTextContainer}>
-                    <Text style={styles.detailLabel}>Created</Text>
-                    <Text style={styles.detailValue}>
-                      {new Date(selectedEvent.created_at).toLocaleDateString(
-                        'en-US',
-                        {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        },
-                      )}
-                    </Text>
-                  </View>
-                </View>
-
-                {selectedEvent.description && (
                   <View style={styles.detailRow}>
                     <Ionicons
-                      name="document-text"
+                      name="calendar"
                       size={20}
                       color={colors.primary}
                     />
                     <View style={styles.detailTextContainer}>
-                      <Text style={styles.detailLabel}>Description</Text>
+                      <Text style={styles.detailLabel}>Date & Time</Text>
                       <Text style={styles.detailValue}>
-                        {selectedEvent.description}
+                        From: {formatDate(selectedEvent.from_date)} at{' '}
+                        {formatTime(selectedEvent.from_time)}
+                      </Text>
+                      <Text style={styles.detailValue}>
+                        To: {formatDate(selectedEvent.to_date)} at{' '}
+                        {formatTime(selectedEvent.to_time)}
                       </Text>
                     </View>
                   </View>
-                )}
+
+                  <View style={styles.detailRow}>
+                    <Ionicons name="people" size={20} color={colors.primary} />
+                    <View style={styles.detailTextContainer}>
+                      <Text style={styles.detailLabel}>Number of People</Text>
+                      <Text style={styles.detailValue}>
+                        {selectedEvent.number_of_people || 0} guests
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Ionicons name="cash" size={20} color={colors.primary} />
+                    <View style={styles.detailTextContainer}>
+                      <Text style={styles.detailLabel}>
+                        Payment Information
+                      </Text>
+                      <Text style={styles.detailValue}>
+                        Amount Received: ₹
+                        {(selectedEvent.amount_received || 0).toLocaleString()}
+                      </Text>
+                      {selectedEvent.amount_pending > 0 && (
+                        <Text
+                          style={[
+                            styles.detailValue,
+                            { color: colors.warning },
+                          ]}
+                        >
+                          Amount Pending: ₹
+                          {selectedEvent.amount_pending.toLocaleString()}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Ionicons name="card" size={20} color={colors.primary} />
+                    <View style={styles.detailTextContainer}>
+                      <Text style={styles.detailLabel}>Payment Status</Text>
+                      <View
+                        style={[
+                          styles.paymentStatusBadge,
+                          styles.detailStatusBadge,
+                          {
+                            backgroundColor:
+                              getPaymentStatusColor(
+                                selectedEvent.payment_status,
+                              ) + '20',
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.paymentStatusText,
+                            styles.detailStatusText,
+                            {
+                              color: getPaymentStatusColor(
+                                selectedEvent.payment_status,
+                              ),
+                            },
+                          ]}
+                        >
+                          {getPaymentStatusLabel(selectedEvent.payment_status)}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Ionicons name="time" size={20} color={colors.primary} />
+                    <View style={styles.detailTextContainer}>
+                      <Text style={styles.detailLabel}>Created</Text>
+                      <Text style={styles.detailValue}>
+                        {new Date(selectedEvent.created_at).toLocaleDateString(
+                          'en-US',
+                          {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          },
+                        )}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {selectedEvent.description && (
+                    <View style={styles.detailRow}>
+                      <Ionicons
+                        name="document-text"
+                        size={20}
+                        color={colors.primary}
+                      />
+                      <View style={styles.detailTextContainer}>
+                        <Text style={styles.detailLabel}>Description</Text>
+                        <Text style={styles.detailValue}>
+                          {selectedEvent.description}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.detailActions}>
+                  <TouchableOpacity
+                    style={[styles.detailActionButton, styles.editButton]}
+                    onPress={() => {
+                      setShowEventDetail(false);
+                      handleEditEvent(selectedEvent);
+                    }}
+                  >
+                    <Ionicons
+                      name="pencil"
+                      size={20}
+                      color={colors.background}
+                    />
+                    <Text style={styles.detailActionText}>Edit Event</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.detailActionButton, styles.deleteButton]}
+                    onPress={() => {
+                      setShowEventDetail(false);
+                      handleDeleteEvent(selectedEvent);
+                    }}
+                  >
+                    <Ionicons
+                      name="trash"
+                      size={20}
+                      color={colors.background}
+                    />
+                    <Text style={styles.detailActionText}>Delete Event</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            )}
+          </SafeAreaView>
+        </Modal>
+
+        {/* Filter Modal */}
+        <Modal
+          visible={showFilters}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowFilters(false)}
+        >
+          <SafeAreaView style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => setShowFilters(false)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>Filter Events</Text>
+              <TouchableOpacity onPress={applyFilters}>
+                <Text style={styles.modalApplyText}>Apply</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalContent}>
+              <View style={styles.filterSection}>
+                <Text style={styles.filterLabel}>Search</Text>
+                <TextInput
+                  style={styles.filterInput}
+                  placeholder="Search events by name..."
+                  value={filters.search}
+                  onChangeText={text =>
+                    setFilters({ ...filters, search: text })
+                  }
+                />
               </View>
 
-              <View style={styles.detailActions}>
-                <TouchableOpacity
-                  style={[styles.detailActionButton, styles.editButton]}
-                  onPress={() => {
-                    setShowEventDetail(false);
-                    handleEditEvent(selectedEvent);
-                  }}
-                >
-                  <Ionicons name="pencil" size={20} color={colors.background} />
-                  <Text style={styles.detailActionText}>Edit Event</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.detailActionButton, styles.deleteButton]}
-                  onPress={() => {
-                    setShowEventDetail(false);
-                    handleDeleteEvent(selectedEvent);
-                  }}
-                >
-                  <Ionicons name="trash" size={20} color={colors.background} />
-                  <Text style={styles.detailActionText}>Delete Event</Text>
-                </TouchableOpacity>
+              <View style={styles.filterSection}>
+                <Text style={styles.filterLabel}>From Date</Text>
+                <TextInput
+                  style={styles.filterInput}
+                  placeholder="YYYY-MM-DD"
+                  value={filters.fromDate}
+                  onChangeText={text =>
+                    setFilters({ ...filters, fromDate: text })
+                  }
+                />
               </View>
+
+              <View style={styles.filterSection}>
+                <Text style={styles.filterLabel}>To Date</Text>
+                <TextInput
+                  style={styles.filterInput}
+                  placeholder="YYYY-MM-DD"
+                  value={filters.toDate}
+                  onChangeText={text =>
+                    setFilters({ ...filters, toDate: text })
+                  }
+                />
+              </View>
+
+              <View style={styles.filterSection}>
+                <Text style={styles.filterLabel}>Limit</Text>
+                <TextInput
+                  style={styles.filterInput}
+                  placeholder="Number of events to fetch"
+                  value={filters.limit.toString()}
+                  keyboardType="numeric"
+                  onChangeText={text =>
+                    setFilters({ ...filters, limit: parseInt(text) || 50 })
+                  }
+                />
+              </View>
+
+              <TouchableOpacity
+                style={styles.resetButton}
+                onPress={resetFilters}
+              >
+                <Text style={styles.resetButtonText}>Reset Filters</Text>
+              </TouchableOpacity>
             </ScrollView>
-          )}
-        </SafeAreaView>
-      </Modal>
-
-      {/* Filter Modal */}
-      <Modal
-        visible={showFilters}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowFilters(false)}
-      >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowFilters(false)}>
-              <Text style={styles.modalCancelText}>Cancel</Text>
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Filter Events</Text>
-            <TouchableOpacity onPress={applyFilters}>
-              <Text style={styles.modalApplyText}>Apply</Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.modalContent}>
-            <View style={styles.filterSection}>
-              <Text style={styles.filterLabel}>Search</Text>
-              <TextInput
-                style={styles.filterInput}
-                placeholder="Search events by name..."
-                value={filters.search}
-                onChangeText={text => setFilters({ ...filters, search: text })}
-              />
-            </View>
-
-            <View style={styles.filterSection}>
-              <Text style={styles.filterLabel}>From Date</Text>
-              <TextInput
-                style={styles.filterInput}
-                placeholder="YYYY-MM-DD"
-                value={filters.fromDate}
-                onChangeText={text =>
-                  setFilters({ ...filters, fromDate: text })
-                }
-              />
-            </View>
-
-            <View style={styles.filterSection}>
-              <Text style={styles.filterLabel}>To Date</Text>
-              <TextInput
-                style={styles.filterInput}
-                placeholder="YYYY-MM-DD"
-                value={filters.toDate}
-                onChangeText={text => setFilters({ ...filters, toDate: text })}
-              />
-            </View>
-
-            <View style={styles.filterSection}>
-              <Text style={styles.filterLabel}>Limit</Text>
-              <TextInput
-                style={styles.filterInput}
-                placeholder="Number of events to fetch"
-                value={filters.limit.toString()}
-                keyboardType="numeric"
-                onChangeText={text =>
-                  setFilters({ ...filters, limit: parseInt(text) || 50 })
-                }
-              />
-            </View>
-
-            <TouchableOpacity style={styles.resetButton} onPress={resetFilters}>
-              <Text style={styles.resetButtonText}>Reset Filters</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
-    </SafeAreaView>
+          </SafeAreaView>
+        </Modal>
+      </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  safeArea: {
     flex: 1,
     backgroundColor: colors.background,
   },
@@ -890,10 +954,14 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   backButton: {
-    padding: 8,
-    borderRadius: 20,
+    padding: 12,
+    borderRadius: 25,
     backgroundColor: colors.lightGray,
     marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 44,
+    minHeight: 44,
   },
   headerContent: {
     flex: 1,
