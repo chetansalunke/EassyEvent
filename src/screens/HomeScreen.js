@@ -636,7 +636,7 @@ const HomeScreen = ({ navigation }) => {
 
               <TouchableOpacity
                 style={styles.quickActionCard}
-                onPress={() => setSelectedTab(1)}
+                onPress={() => navigation.navigate('Events')}
               >
                 <Ionicons name="calendar" size={32} color={colors.warning} />
                 <Text style={styles.quickActionText} numberOfLines={2}>
