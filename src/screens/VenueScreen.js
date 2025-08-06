@@ -19,8 +19,10 @@ import {
   Dimensions,
   PermissionsAndroid,
   Linking,
+  BackHandler,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import {
@@ -96,6 +98,31 @@ const VenueScreen = ({ navigation }) => {
     loadVenueDetails();
     loadVenueImages();
   }, [token]);
+
+  // Handle Android hardware back button
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        if (showImageGallery) {
+          setShowImageGallery(false);
+          return true;
+        }
+        if (showEditModal) {
+          setShowEditModal(false);
+          return true;
+        }
+        navigation.goBack();
+        return true;
+      };
+
+      const backHandler = BackHandler.addEventListener(
+        'hardwareBackPress',
+        onBackPress,
+      );
+
+      return () => backHandler.remove();
+    }, [navigation, showImageGallery, showEditModal]),
+  );
 
   // Load venue images
   const loadVenueImages = async () => {
@@ -869,6 +896,8 @@ const VenueScreen = ({ navigation }) => {
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}
+            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+            activeOpacity={0.7}
           >
             <Ionicons name="arrow-back" size={24} color={colors.secondary} />
           </TouchableOpacity>
@@ -892,11 +921,18 @@ const VenueScreen = ({ navigation }) => {
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
+          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+          activeOpacity={0.7}
         >
           <Ionicons name="arrow-back" size={24} color={colors.secondary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Venue Management</Text>
-        <TouchableOpacity style={styles.editButton} onPress={handleEditVenue}>
+        <TouchableOpacity
+          style={styles.editButton}
+          onPress={handleEditVenue}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          activeOpacity={0.7}
+        >
           <Ionicons name="create-outline" size={24} color={colors.primary} />
         </TouchableOpacity>
       </View>
@@ -1055,7 +1091,11 @@ const VenueScreen = ({ navigation }) => {
       >
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.galleryModalHeader}>
-            <TouchableOpacity onPress={() => setShowImageGallery(false)}>
+            <TouchableOpacity
+              onPress={() => setShowImageGallery(false)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              activeOpacity={0.7}
+            >
               <Text style={styles.modalCancelText}>Close</Text>
             </TouchableOpacity>
             <Text style={styles.modalTitle}>
@@ -1070,6 +1110,8 @@ const VenueScreen = ({ navigation }) => {
                   );
                 }
               }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              activeOpacity={0.7}
             >
               <Ionicons name="trash-outline" size={24} color={colors.error} />
             </TouchableOpacity>
@@ -1162,13 +1204,19 @@ const VenueScreen = ({ navigation }) => {
           >
             {/* Modal Header */}
             <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setShowEditModal(false)}>
+              <TouchableOpacity
+                onPress={() => setShowEditModal(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
               <Text style={styles.modalTitle}>Edit Venue</Text>
               <TouchableOpacity
                 onPress={handleUpdateVenue}
                 disabled={isUpdating}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
               >
                 {isUpdating ? (
                   <ActivityIndicator size="small" color={colors.primary} />
@@ -1366,9 +1414,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   backButton: {
-    padding: 8,
-    borderRadius: 20,
+    padding: 12,
+    borderRadius: 25,
     backgroundColor: colors.lightGray,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 18,
@@ -1382,9 +1434,13 @@ const styles = StyleSheet.create({
     width: 40,
   },
   editButton: {
-    padding: 8,
-    borderRadius: 20,
+    padding: 12,
+    borderRadius: 25,
     backgroundColor: colors.lightGray,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   content: {
     flex: 1,

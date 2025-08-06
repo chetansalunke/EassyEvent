@@ -14,8 +14,10 @@ import {
   Modal,
   StatusBar,
   Platform,
+  BackHandler,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { colors } from '../utils/colors';
 import { useAuth } from '../context/AuthContext';
@@ -52,6 +54,31 @@ const EventsScreen = ({ navigation }) => {
       tokenPreview: token ? `${token.substring(0, 10)}...` : 'No token',
     });
   }, [token]);
+
+  // Handle Android hardware back button
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        if (showEventDetail) {
+          setShowEventDetail(false);
+          return true;
+        }
+        if (showFilters) {
+          setShowFilters(false);
+          return true;
+        }
+        navigation.goBack();
+        return true;
+      };
+
+      const backHandler = BackHandler.addEventListener(
+        'hardwareBackPress',
+        onBackPress,
+      );
+
+      return () => backHandler.remove();
+    }, [navigation, showEventDetail, showFilters]),
+  );
 
   // Load events on component mount
   useEffect(() => {
@@ -322,7 +349,8 @@ const EventsScreen = ({ navigation }) => {
             <TouchableOpacity
               style={styles.backButton}
               onPress={() => navigation.goBack()}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+              activeOpacity={0.7}
             >
               <Ionicons name="arrow-back" size={24} color={colors.secondary} />
             </TouchableOpacity>
@@ -335,21 +363,24 @@ const EventsScreen = ({ navigation }) => {
             <TouchableOpacity
               style={styles.addButton}
               onPress={() => navigation.navigate('EditBooking')}
-              hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              activeOpacity={0.7}
             >
               <Ionicons name="add" size={24} color={colors.background} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.filterButton}
               onPress={() => setShowFilters(true)}
-              hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              activeOpacity={0.7}
             >
               <Ionicons name="filter" size={20} color={colors.primary} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.viewToggleButton}
               onPress={handleViewToggle}
-              hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              activeOpacity={0.7}
             >
               <Ionicons
                 name={currentView === 'calendar' ? 'list' : 'calendar'}
@@ -375,7 +406,8 @@ const EventsScreen = ({ navigation }) => {
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+            activeOpacity={0.7}
           >
             <Ionicons name="arrow-back" size={24} color={colors.secondary} />
           </TouchableOpacity>
@@ -388,21 +420,24 @@ const EventsScreen = ({ navigation }) => {
           <TouchableOpacity
             style={styles.addButton}
             onPress={() => navigation.navigate('EditBooking')}
-            hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            activeOpacity={0.7}
           >
             <Ionicons name="add" size={24} color={colors.background} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.filterButton}
             onPress={() => setShowFilters(true)}
-            hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            activeOpacity={0.7}
           >
             <Ionicons name="filter" size={20} color={colors.primary} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.viewToggleButton}
             onPress={handleViewToggle}
-            hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            activeOpacity={0.7}
           >
             <Ionicons
               name={currentView === 'calendar' ? 'list' : 'calendar'}
@@ -671,7 +706,11 @@ const EventsScreen = ({ navigation }) => {
         >
           <SafeAreaView style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setShowEventDetail(false)}>
+              <TouchableOpacity
+                onPress={() => setShowEventDetail(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
                 <Text style={styles.modalCancelText}>Close</Text>
               </TouchableOpacity>
               <Text style={styles.modalTitle}>Event Details</Text>
@@ -682,6 +721,8 @@ const EventsScreen = ({ navigation }) => {
                     handleEditEvent(selectedEvent);
                   }
                 }}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
               >
                 <Text style={styles.modalApplyText}>Edit</Text>
               </TouchableOpacity>
@@ -861,11 +902,19 @@ const EventsScreen = ({ navigation }) => {
         >
           <SafeAreaView style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setShowFilters(false)}>
+              <TouchableOpacity
+                onPress={() => setShowFilters(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
               <Text style={styles.modalTitle}>Filter Events</Text>
-              <TouchableOpacity onPress={applyFilters}>
+              <TouchableOpacity
+                onPress={applyFilters}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
                 <Text style={styles.modalApplyText}>Apply</Text>
               </TouchableOpacity>
             </View>

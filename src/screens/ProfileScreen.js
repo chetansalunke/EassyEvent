@@ -14,6 +14,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   RefreshControl,
+  BackHandler,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -21,7 +22,7 @@ import { colors } from '../utils/colors';
 import { useAuth } from '../context/AuthContext';
 import { getVenueDetails, updateVenueDetails } from '../utils/authUtils';
 import { getScreenSafeArea } from '../utils/safeArea';
-
+import { useFocusEffect } from '@react-navigation/native';
 const ProfileScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const [isLoading, setIsLoading] = useState(true);
@@ -42,6 +43,27 @@ const ProfileScreen = ({ navigation }) => {
     rate_type: '',
   });
   const { user, token } = useAuth();
+
+  // Handle Android hardware back button
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        if (showEditModal) {
+          setShowEditModal(false);
+          return true;
+        }
+        navigation.goBack();
+        return true;
+      };
+
+      const backHandler = BackHandler.addEventListener(
+        'hardwareBackPress',
+        onBackPress,
+      );
+
+      return () => backHandler.remove();
+    }, [navigation, showEditModal]),
+  );
 
   // Load venue details
   const loadVenueDetails = async () => {
@@ -191,7 +213,8 @@ const ProfileScreen = ({ navigation }) => {
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+            activeOpacity={0.7}
           >
             <Ionicons name="arrow-back" size={24} color={colors.secondary} />
           </TouchableOpacity>
@@ -215,7 +238,8 @@ const ProfileScreen = ({ navigation }) => {
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+          activeOpacity={0.7}
         >
           <Ionicons name="arrow-back" size={24} color={colors.secondary} />
         </TouchableOpacity>
@@ -223,7 +247,8 @@ const ProfileScreen = ({ navigation }) => {
         <TouchableOpacity
           style={styles.editButton}
           onPress={handleEditVenue}
-          hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          activeOpacity={0.7}
         >
           <Ionicons name="create-outline" size={24} color={colors.primary} />
         </TouchableOpacity>
@@ -385,13 +410,19 @@ const ProfileScreen = ({ navigation }) => {
           >
             {/* Modal Header */}
             <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setShowEditModal(false)}>
+              <TouchableOpacity
+                onPress={() => setShowEditModal(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
               <Text style={styles.modalTitle}>Edit Venue</Text>
               <TouchableOpacity
                 onPress={handleUpdateVenue}
                 disabled={isUpdating}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
               >
                 {isUpdating ? (
                   <ActivityIndicator size="small" color={colors.primary} />
