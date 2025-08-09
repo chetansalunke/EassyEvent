@@ -6,11 +6,12 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
-  ActivityIndicator,          
+  ActivityIndicator,
   StyleSheet,
   SafeAreaView,
   StatusBar,
   Platform,
+  Image,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { colors } from '../utils/colors';
@@ -404,28 +405,11 @@ const ResetPasswordScreen = ({ navigation }) => {
             <Ionicons name="arrow-back" size={24} color={colors.secondary} />
           </TouchableOpacity>
           <View style={styles.logoContainer}>
-            <View style={styles.logoIcon}>
-              <View style={styles.logoPattern}>
-                <View
-                  style={[
-                    styles.logoDiamond,
-                    { transform: [{ rotate: '45deg' }] },
-                  ]}
-                />
-                <View
-                  style={[
-                    styles.logoDiamond,
-                    {
-                      transform: [{ rotate: '45deg' }],
-                      position: 'absolute',
-                      top: 8,
-                      left: 8,
-                    },
-                  ]}
-                />
-              </View>
-            </View>
-            <Text style={styles.logoText}>ENCALM</Text>
+            <Image
+              source={require('../../assets/logo.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
           </View>
         </View>
 
@@ -488,30 +472,11 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 50,
   },
-  logoIcon: {
-    width: 80,
-    height: 80,
-    backgroundColor: colors.primary,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+  logoImage: {
+    width: 120,
+    height: 120,
     marginBottom: 16,
-  },
-  logoPattern: {
-    position: 'relative',
-  },
-  logoDiamond: {
-    width: 20,
-    height: 20,
-    backgroundColor: colors.background,
-  },
-  logoText: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: colors.secondary,
-    letterSpacing: 2,
   },
   formContainer: {
     flex: 1,

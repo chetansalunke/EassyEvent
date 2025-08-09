@@ -31,11 +31,6 @@ const SplashScreen = ({ navigation }) => {
             resizeMode="contain"
           />
         </View>
-        <View style={styles.loadingContainer}>
-          <View style={styles.progressBar}>
-            <View style={styles.progressFill} />
-          </View>
-        </View>
       </View>
     </SafeAreaView>
   );
