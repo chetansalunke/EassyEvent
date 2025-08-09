@@ -81,16 +81,16 @@ const VenueScreen = ({ navigation }) => {
 
   // Dropdown options
   const CITY_OPTIONS = [
-    Mumbai,
-    Pune,
-    Bengaluru,
-    Delhi,
-    Kolkata,
-    Chennai,
-    Hyderabad,
-    Ahmedabad,
-    Nashik,
-    Aurangabad,
+    'Mumbai',
+    'Pune',
+    'Bengaluru',
+    'Delhi',
+    'Kolkata',
+    'Chennai',
+    'Hyderabad',
+    'Ahmedabad',
+    'Nashik',
+    'Aurangabad',
   ];
 
   const STATE_OPTIONS = [

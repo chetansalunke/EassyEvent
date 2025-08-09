@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -18,21 +18,102 @@ import { colors } from '../utils/colors';
 import { validateForm, validationRules } from '../utils/validation';
 import API_CONFIG from '../config/apiConfig';
 
-// Simple static data for states and cities
-const SIMPLE_STATES = [
-  'Maharashtra',
-  'Karnataka',
-  'Tamil Nadu',
-  'Gujarat',
+// Enhanced data for states and cities with comprehensive options
+const ENHANCED_STATES = [
+  'Andhra Pradesh',
+  'Arunachal Pradesh',
+  'Assam',
+  'Bihar',
+  'Chhattisgarh',
   'Delhi',
+  'Goa',
+  'Gujarat',
+  'Haryana',
+  'Himachal Pradesh',
+  'Jharkhand',
+  'Karnataka',
+  'Kerala',
+  'Madhya Pradesh',
+  'Maharashtra',
+  'Manipur',
+  'Meghalaya',
+  'Mizoram',
+  'Nagaland',
+  'Odisha',
+  'Punjab',
+  'Rajasthan',
+  'Sikkim',
+  'Tamil Nadu',
+  'Telangana',
+  'Tripura',
+  'Uttar Pradesh',
+  'Uttarakhand',
+  'West Bengal',
 ];
 
-const SIMPLE_CITIES = [
-  'Mumbai',
-  'Bangalore',
-  'Chennai',
+const ENHANCED_CITIES = [
+  'Agra',
   'Ahmedabad',
+  'Ajmer',
+  'Amravati',
+  'Amritsar',
+  'Aurangabad',
+  'Bangalore',
+  'Bengaluru',
+  'Bhopal',
+  'Bhubaneswar',
+  'Chandigarh',
+  'Chennai',
+  'Coimbatore',
+  'Delhi',
+  'Dhanbad',
+  'Faridabad',
+  'Ghaziabad',
+  'Guwahati',
+  'Gwalior',
+  'Hyderabad',
+  'Indore',
+  'Jabalpur',
+  'Jaipur',
+  'Jalandhar',
+  'Jammu',
+  'Jamshedpur',
+  'Jodhpur',
+  'Kanpur',
+  'Kochi',
+  'Kolhapur',
+  'Kolkata',
+  'Kota',
+  'Kozhikode',
+  'Lucknow',
+  'Ludhiana',
+  'Madurai',
+  'Mangalore',
+  'Meerut',
+  'Mumbai',
+  'Mysore',
+  'Nagpur',
+  'Nashik',
+  'Navi Mumbai',
   'New Delhi',
+  'Noida',
+  'Patna',
+  'Pune',
+  'Raipur',
+  'Rajkot',
+  'Ranchi',
+  'Salem',
+  'Srinagar',
+  'Surat',
+  'Thane',
+  'Thiruvananthapuram',
+  'Thrissur',
+  'Tiruchirappalli',
+  'Udaipur',
+  'Vadodara',
+  'Varanasi',
+  'Vijayawada',
+  'Visakhapatnam',
 ];
 
 const RATE_TYPES = ['per day', 'per hour'];
@@ -251,33 +332,42 @@ const SignUpScreen = ({ navigation }) => {
     }
   };
 
-  // Handle dropdown selections
-  const selectCity = city => {
-    setFormData(prev => ({ ...prev, city }));
-    setShowCityDropdown(false);
-    if (errors.city) {
-      setErrors(prev => ({ ...prev, city: null }));
-    }
-  };
+  // Handle dropdown selections with useCallback to prevent re-renders
+  const selectCity = useCallback(
+    city => {
+      setFormData(prev => ({ ...prev, city }));
+      setShowCityDropdown(false);
+      if (errors.city) {
+        setErrors(prev => ({ ...prev, city: null }));
+      }
+    },
+    [errors.city],
+  );
 
-  const selectState = state => {
-    setFormData(prev => ({ ...prev, state }));
-    setShowStateDropdown(false);
-    if (errors.state) {
-      setErrors(prev => ({ ...prev, state: null }));
-    }
-  };
+  const selectState = useCallback(
+    state => {
+      setFormData(prev => ({ ...prev, state }));
+      setShowStateDropdown(false);
+      if (errors.state) {
+        setErrors(prev => ({ ...prev, state: null }));
+      }
+    },
+    [errors.state],
+  );
 
-  const selectRateType = rateType => {
-    setFormData(prev => ({ ...prev, rateType }));
-    setShowRateTypeDropdown(false);
-    if (errors.rateType) {
-      setErrors(prev => ({ ...prev, rateType: null }));
-    }
-  };
+  const selectRateType = useCallback(
+    rateType => {
+      setFormData(prev => ({ ...prev, rateType }));
+      setShowRateTypeDropdown(false);
+      if (errors.rateType) {
+        setErrors(prev => ({ ...prev, rateType: null }));
+      }
+    },
+    [errors.rateType],
+  );
 
-  // Simple dropdown component
-  const SimpleDropdown = ({
+  // Simple dropdown component without search functionality
+  const EnhancedDropdown = ({
     value,
     placeholder,
     data,
@@ -306,17 +396,42 @@ const SignUpScreen = ({ navigation }) => {
         <View style={styles.dropdownList}>
           <ScrollView
             style={styles.dropdownScrollView}
+            showsVerticalScrollIndicator={true}
+            bounces={false}
+            scrollEnabled={true}
+            keyboardShouldPersistTaps="always"
             nestedScrollEnabled={true}
-            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.dropdownContentContainer}
           >
             {data.map((item, index) => (
               <TouchableOpacity
-                key={index}
-                style={styles.dropdownItem}
-                onPress={() => onSelect(item)}
+                key={`${item}-${index}`}
+                style={[
+                  styles.dropdownItem,
+                  value === item && styles.selectedDropdownItem,
+                  index === data.length - 1 && styles.dropdownItemLast,
+                ]}
+                onPress={() => {
+                  onSelect(item);
+                }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.dropdownItemText}>{item}</Text>
+                <Text
+                  style={[
+                    styles.dropdownItemText,
+                    value === item && styles.selectedDropdownItemText,
+                  ]}
+                >
+                  {item}
+                </Text>
+                {value === item && (
+                  <Ionicons
+                    name="checkmark"
+                    size={20}
+                    color={colors.primary}
+                    style={styles.checkIcon}
+                  />
+                )}
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -347,6 +462,9 @@ const SignUpScreen = ({ navigation }) => {
             contentContainerStyle={styles.scrollContainer}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
+            keyboardDismissMode="none"
+            automaticallyAdjustKeyboardInsets={false}
+            automaticallyAdjustContentInsets={false}
           >
             <View style={styles.header}>
               <TouchableOpacity
@@ -449,10 +567,10 @@ const SignUpScreen = ({ navigation }) => {
                   style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}
                 >
                   <Text style={styles.inputLabel}>City</Text>
-                  <SimpleDropdown
+                  <EnhancedDropdown
                     value={formData.city}
                     placeholder="Select the city"
-                    data={SIMPLE_CITIES}
+                    data={ENHANCED_CITIES}
                     onSelect={selectCity}
                     isOpen={showCityDropdown}
                     onToggle={() => {
@@ -471,10 +589,10 @@ const SignUpScreen = ({ navigation }) => {
                   style={[styles.inputContainer, { flex: 1, marginLeft: 10 }]}
                 >
                   <Text style={styles.inputLabel}>State</Text>
-                  <SimpleDropdown
+                  <EnhancedDropdown
                     value={formData.state}
                     placeholder="Select the state"
-                    data={SIMPLE_STATES}
+                    data={ENHANCED_STATES}
                     onSelect={selectState}
                     isOpen={showStateDropdown}
                     onToggle={() => {
@@ -573,7 +691,7 @@ const SignUpScreen = ({ navigation }) => {
                   style={[styles.inputContainer, { flex: 1, marginLeft: 10 }]}
                 >
                   <Text style={styles.inputLabel}>Rate Type</Text>
-                  <SimpleDropdown
+                  <EnhancedDropdown
                     value={formData.rateType}
                     placeholder="Select rate type"
                     data={RATE_TYPES}
@@ -820,7 +938,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 0,
     borderBottomLeftRadius: 12,
     borderBottomRightRadius: 12,
-    maxHeight: 150,
+    maxHeight: 200,
     elevation: 5,
     shadowColor: '#000',
     shadowOffset: {
@@ -832,17 +950,39 @@ const styles = StyleSheet.create({
     zIndex: 1001,
   },
   dropdownScrollView: {
-    maxHeight: 150,
+    maxHeight: 200,
+  },
+  dropdownContentContainer: {
+    paddingVertical: 4,
   },
   dropdownItem: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderBottomWidth: 1,
+    borderBottomWidth: 0.5,
     borderBottomColor: colors.lightGray,
+    backgroundColor: colors.background,
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dropdownItemLast: {
+    borderBottomWidth: 0,
   },
   dropdownItemText: {
     fontSize: 16,
     color: colors.secondary,
+    flex: 1,
+  },
+  selectedDropdownItem: {
+    backgroundColor: colors.primary + '10',
+  },
+  selectedDropdownItemText: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  checkIcon: {
+    marginLeft: 8,
   },
   disabledDropdown: {
     backgroundColor: colors.lightGray,
