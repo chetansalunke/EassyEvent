@@ -145,7 +145,6 @@ const EventsScreen = ({ navigation }) => {
         setEvents(response.data.results);
         // Mark booking dates on calendar
         const marks = {};
-        const dateEventMap = {};
 
         response.data.results.forEach(event => {
           let current = new Date(event.from_date);
@@ -154,24 +153,20 @@ const EventsScreen = ({ navigation }) => {
           while (current <= end) {
             const dateStr = current.toISOString().split('T')[0];
 
-            // Track events per date
-            if (!dateEventMap[dateStr]) {
-              dateEventMap[dateStr] = [];
-            }
-            dateEventMap[dateStr].push(event);
-
-            // Mark date on calendar
+            // Mark date on calendar with better styling
             marks[dateStr] = {
               marked: true,
-              dotColor: '#2196F3',
+              dotColor: colors.primary,
               customStyles: {
                 container: {
                   backgroundColor: '#e3f2fd',
                   borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: colors.primary + '30',
                 },
                 text: {
-                  color: '#1565c0',
-                  fontWeight: 'bold',
+                  color: colors.primary,
+                  fontWeight: '600',
                 },
               },
             };
@@ -180,11 +175,24 @@ const EventsScreen = ({ navigation }) => {
         });
 
         setMarkedDates(marks);
-        // Store the date-event mapping for quick lookup
-        setEvents(response.data.results);
+
+        // Clear selected date and events when data changes
+        if (selectedDate) {
+          // Re-filter events for currently selected date
+          const eventsForDate = response.data.results.filter(event => {
+            const start = new Date(event.from_date);
+            const end = new Date(event.to_date);
+            const selected = new Date(selectedDate);
+            return selected >= start && selected <= end;
+          });
+          setSelectedDateEvents(eventsForDate);
+          setSelectedEvent(eventsForDate.length > 0 ? eventsForDate[0] : null);
+        }
       } else {
         setEvents([]);
         setMarkedDates({});
+        setSelectedDateEvents([]);
+        setSelectedEvent(null);
       }
     } catch (error) {
       console.error('API Error:', error);
@@ -221,6 +229,10 @@ const EventsScreen = ({ navigation }) => {
 
   const onRefresh = async () => {
     setIsRefreshing(true);
+    // Clear current selection to avoid inconsistencies
+    setSelectedDate(null);
+    setSelectedDateEvents([]);
+    setSelectedEvent(null);
     await fetchEventsFromApi();
     setIsRefreshing(false);
   };
@@ -299,7 +311,19 @@ const EventsScreen = ({ navigation }) => {
 
   // Calendar date select handler
   const handleDayPress = day => {
+    console.log('Day pressed:', day.dateString);
+
+    // If clicking the same date, deselect it
+    if (selectedDate === day.dateString) {
+      setSelectedDate(null);
+      setSelectedDateEvents([]);
+      setSelectedEvent(null);
+      return;
+    }
+
+    // Select new date
     setSelectedDate(day.dateString);
+
     // Find all events for this date
     const eventsForDate = events.filter(event => {
       const start = new Date(event.from_date);
@@ -308,6 +332,7 @@ const EventsScreen = ({ navigation }) => {
       return selected >= start && selected <= end;
     });
 
+    console.log('Events for selected date:', eventsForDate.length);
     setSelectedDateEvents(eventsForDate);
     setSelectedEvent(eventsForDate.length > 0 ? eventsForDate[0] : null);
   };
@@ -318,7 +343,15 @@ const EventsScreen = ({ navigation }) => {
   };
 
   const handleViewToggle = () => {
-    setCurrentView(currentView === 'calendar' ? 'list' : 'calendar');
+    const newView = currentView === 'calendar' ? 'list' : 'calendar';
+    setCurrentView(newView);
+
+    // Clear selected date when switching to list view
+    if (newView === 'list') {
+      setSelectedDate(null);
+      setSelectedDateEvents([]);
+      setSelectedEvent(null);
+    }
   };
 
   const applyFilters = () => {
@@ -459,6 +492,7 @@ const EventsScreen = ({ navigation }) => {
             }
           >
             <Calendar
+              key={`calendar-${events.length}-${selectedDate || 'none'}`}
               style={{ borderRadius: 12, marginBottom: 16 }}
               markingType={'custom'}
               markedDates={{
@@ -469,11 +503,26 @@ const EventsScreen = ({ navigation }) => {
                         ...(markedDates[selectedDate] || {}),
                         selected: true,
                         selectedColor: colors.primary,
+                        selectedTextColor: colors.background,
+                        customStyles: {
+                          container: {
+                            backgroundColor: colors.primary,
+                            borderRadius: 8,
+                          },
+                          text: {
+                            color: colors.background,
+                            fontWeight: 'bold',
+                          },
+                        },
                       },
                     }
                   : {}),
               }}
               onDayPress={handleDayPress}
+              enableSwipeMonths={true}
+              hideExtraDays={false}
+              disableMonthChange={false}
+              firstDay={1}
               theme={{
                 backgroundColor: colors.background,
                 calendarBackground: colors.background,
@@ -487,6 +536,15 @@ const EventsScreen = ({ navigation }) => {
                 arrowColor: colors.primary,
                 monthTextColor: colors.secondary,
                 indicatorColor: colors.primary,
+                textDayFontFamily: 'System',
+                textMonthFontFamily: 'System',
+                textDayHeaderFontFamily: 'System',
+                textDayFontWeight: '400',
+                textMonthFontWeight: 'bold',
+                textDayHeaderFontWeight: '400',
+                textDayFontSize: 16,
+                textMonthFontSize: 16,
+                textDayHeaderFontSize: 13,
               }}
             />
             {/* Show event details for selected date */}
@@ -567,6 +625,24 @@ const EventsScreen = ({ navigation }) => {
                   </TouchableOpacity>
                 ))}
               </View>
+            ) : selectedDate ? (
+              <View style={styles.emptyState}>
+                <Ionicons
+                  name="calendar-clear-outline"
+                  size={64}
+                  color={colors.gray}
+                />
+                <Text style={styles.emptyTitle}>No events on this date</Text>
+                <Text style={styles.emptySubtitle}>
+                  There are no bookings scheduled for {formatDate(selectedDate)}
+                </Text>
+                <TouchableOpacity
+                  style={styles.emptyButton}
+                  onPress={() => navigation.navigate('EditBooking')}
+                >
+                  <Text style={styles.emptyButtonText}>Create Event</Text>
+                </TouchableOpacity>
+              </View>
             ) : (
               <View style={styles.emptyState}>
                 <Ionicons
@@ -574,13 +650,10 @@ const EventsScreen = ({ navigation }) => {
                   size={64}
                   color={colors.gray}
                 />
-                <Text style={styles.emptyTitle}>
-                  {selectedDate ? 'No events on this date' : 'Select a date'}
-                </Text>
+                <Text style={styles.emptyTitle}>Select a date</Text>
                 <Text style={styles.emptySubtitle}>
-                  {selectedDate
-                    ? 'There are no bookings scheduled for this date'
-                    : 'Tap a highlighted date to view event details'}
+                  Tap a highlighted date to view event details, or tap any date
+                  to create a new event
                 </Text>
               </View>
             )}
