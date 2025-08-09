@@ -22,6 +22,15 @@ import API_CONFIG from '../config/apiConfig';
 // Enhanced data for states and cities with comprehensive options
 
 const ENHANCED_STATES = [
+  'Maharashtra',
+  'Delhi',
+  'West Bengal',
+  'Tamil Nadu',
+  'Telangana',
+  'Gujarat',
+];
+
+const ENHANCED_CITIES = [
   'Mumbai',
   'Pune',
   'Bengaluru',
@@ -32,15 +41,6 @@ const ENHANCED_STATES = [
   'Ahmedabad',
   'Nashik',
   'Aurangabad',
-];
-
-const ENHANCED_CITIES = [
-  'Maharashtra',
-  'Delhi',
-  'West Bengal',
-  'Tamil Nadu',
-  'Telangana',
-  'Gujarat',
 ];
 
 const RATE_TYPES = ['per day', 'per hour'];
@@ -421,13 +421,13 @@ const SignUpScreen = ({ navigation }) => {
                   color={colors.secondary}
                 />
               </TouchableOpacity>
-              {/* <View style={styles.logoContainer}>
-              <Image
-                source={require('../../assets/logo.png')} // Update this path to your logo image
-                style={styles.logoImage}
-                resizeMode="contain"
-              />
-            </View> */}
+              <View style={styles.logoContainer}>
+                <Image
+                  source={require('../../assets/logo_original.png')}
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                />
+              </View>
             </View>
 
             <View style={styles.formContainer}>
