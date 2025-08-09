@@ -39,10 +39,11 @@ const EventsScreen = ({ navigation }) => {
   const [showEventDetail, setShowEventDetail] = useState(false);
   const [currentView, setCurrentView] = useState('calendar'); // 'calendar' or 'list'
   const [filters, setFilters] = useState({
-    search: '',
     fromDate: '2025-01-01',
     toDate: '2025-12-31',
   });
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [datePickerType, setDatePickerType] = useState('from'); // 'from' or 'to'
   const { token } = useAuth();
 
   // Debug token state
@@ -63,8 +64,11 @@ const EventsScreen = ({ navigation }) => {
           return true;
         }
         if (showFilters) {
-          
           setShowFilters(false);
+          return true;
+        }
+        if (showDatePicker) {
+          setShowDatePicker(false);
           return true;
         }
         navigation.goBack();
@@ -77,7 +81,7 @@ const EventsScreen = ({ navigation }) => {
       );
 
       return () => backHandler.remove();
-    }, [navigation, showEventDetail, showFilters]),
+    }, [navigation, showEventDetail, showFilters, showDatePicker]),
   );
 
   // Load events on component mount
@@ -114,7 +118,6 @@ const EventsScreen = ({ navigation }) => {
     setIsLoading(true);
     try {
       const queryParams = new URLSearchParams({
-        search: filters.search,
         ordering: 'from_date',
         offset: '0',
         from_date__gte: filters.fromDate,
@@ -355,17 +358,33 @@ const EventsScreen = ({ navigation }) => {
 
   const applyFilters = () => {
     setShowFilters(false);
+    setShowDatePicker(false);
     fetchEventsFromApi();
   };
 
   const resetFilters = () => {
     setFilters({
-      search: '',
       fromDate: '2025-01-01',
       toDate: '2025-12-31',
     });
     setShowFilters(false);
+    setShowDatePicker(false);
     fetchEventsFromApi();
+  };
+
+  const handleDateSelect = day => {
+    const selectedDate = day.dateString;
+    if (datePickerType === 'from') {
+      setFilters(prev => ({ ...prev, fromDate: selectedDate }));
+    } else {
+      setFilters(prev => ({ ...prev, toDate: selectedDate }));
+    }
+    setShowDatePicker(false);
+  };
+
+  const openDatePicker = type => {
+    setDatePickerType(type);
+    setShowDatePicker(true);
   };
 
   if (isLoading) {
@@ -490,7 +509,7 @@ const EventsScreen = ({ navigation }) => {
             }
           >
             <Calendar
-              key={`calendar-${events.length}-${selectedDate || 'none'}`}
+              key={`main-calendar-${events.length}-${selectedDate || 'none'}`}
               style={{ borderRadius: 12, marginBottom: 16 }}
               markingType={'custom'}
               markedDates={{
@@ -992,39 +1011,29 @@ const EventsScreen = ({ navigation }) => {
 
             <ScrollView style={styles.modalContent}>
               <View style={styles.filterSection}>
-                <Text style={styles.filterLabel}>Search</Text>
-                <TextInput
-                  style={styles.filterInput}
-                  placeholder="Search events by name..."
-                  value={filters.search}
-                  onChangeText={text =>
-                    setFilters({ ...filters, search: text })
-                  }
-                />
-              </View>
-
-              <View style={styles.filterSection}>
                 <Text style={styles.filterLabel}>From Date</Text>
-                <TextInput
-                  style={styles.filterInput}
-                  placeholder="YYYY-MM-DD"
-                  value={filters.fromDate}
-                  onChangeText={text =>
-                    setFilters({ ...filters, fromDate: text })
-                  }
-                />
+                <TouchableOpacity
+                  style={styles.datePickerButton}
+                  onPress={() => openDatePicker('from')}
+                >
+                  <Text style={styles.datePickerText}>
+                    {formatDate(filters.fromDate) || 'Select From Date'}
+                  </Text>
+                  <Ionicons name="calendar" size={20} color={colors.primary} />
+                </TouchableOpacity>
               </View>
 
               <View style={styles.filterSection}>
                 <Text style={styles.filterLabel}>To Date</Text>
-                <TextInput
-                  style={styles.filterInput}
-                  placeholder="YYYY-MM-DD"
-                  value={filters.toDate}
-                  onChangeText={text =>
-                    setFilters({ ...filters, toDate: text })
-                  }
-                />
+                <TouchableOpacity
+                  style={styles.datePickerButton}
+                  onPress={() => openDatePicker('to')}
+                >
+                  <Text style={styles.datePickerText}>
+                    {formatDate(filters.toDate) || 'Select To Date'}
+                  </Text>
+                  <Ionicons name="calendar" size={20} color={colors.primary} />
+                </TouchableOpacity>
               </View>
 
               <TouchableOpacity
@@ -1034,6 +1043,70 @@ const EventsScreen = ({ navigation }) => {
                 <Text style={styles.resetButtonText}>Reset Filters</Text>
               </TouchableOpacity>
             </ScrollView>
+          </SafeAreaView>
+        </Modal>
+
+        {/* Date Picker Modal */}
+        <Modal
+          visible={showDatePicker}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowDatePicker(false)}
+        >
+          <SafeAreaView style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity
+                onPress={() => setShowDatePicker(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>
+                Select {datePickerType === 'from' ? 'From' : 'To'} Date
+              </Text>
+              <View style={{ width: 60 }} />
+            </View>
+
+            <View style={styles.modalContent}>
+              <Calendar
+                key={`filter-calendar-${datePickerType}-${showDatePicker}`}
+                onDayPress={handleDateSelect}
+                markingType={'simple'}
+                markedDates={{
+                  [datePickerType === 'from'
+                    ? filters.fromDate
+                    : filters.toDate]: {
+                    selected: true,
+                    selectedColor: colors.primary,
+                    selectedTextColor: colors.background,
+                  },
+                }}
+                theme={{
+                  backgroundColor: colors.background,
+                  calendarBackground: colors.background,
+                  textSectionTitleColor: colors.secondary,
+                  selectedDayBackgroundColor: colors.primary,
+                  selectedDayTextColor: colors.background,
+                  todayTextColor: colors.primary,
+                  dayTextColor: colors.secondary,
+                  textDisabledColor: colors.gray,
+                  dotColor: colors.primary,
+                  arrowColor: colors.primary,
+                  monthTextColor: colors.secondary,
+                  indicatorColor: colors.primary,
+                  textDayFontFamily: 'System',
+                  textMonthFontFamily: 'System',
+                  textDayHeaderFontFamily: 'System',
+                  textDayFontWeight: '400',
+                  textMonthFontWeight: 'bold',
+                  textDayHeaderFontWeight: '400',
+                  textDayFontSize: 16,
+                  textMonthFontSize: 16,
+                  textDayHeaderFontSize: 13,
+                }}
+              />
+            </View>
           </SafeAreaView>
         </Modal>
       </SafeAreaView>
@@ -1283,6 +1356,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.secondary,
     fontWeight: '600',
+  },
+  datePickerButton: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+  },
+  datePickerText: {
+    fontSize: 16,
+    color: colors.secondary,
   },
   viewToggleButton: {
     width: 40,

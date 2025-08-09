@@ -192,7 +192,7 @@ const EditBookingScreen = ({ navigation, route }) => {
       // Validate date order after a short delay to ensure state is updated
       setTimeout(() => {
         validateDateOrder(currentDateField, formattedDate);
-      }, 100);
+      }, 800);
     }
 
     if (Platform.OS === 'ios' && event.type === 'dismissed') {
@@ -222,7 +222,7 @@ const EditBookingScreen = ({ navigation, route }) => {
       // Validate date order after a short delay to ensure state is updated
       setTimeout(() => {
         validateDateOrder(currentTimeField, formattedTime);
-      }, 100);
+      }, 500);
     }
 
     if (Platform.OS === 'ios' && event.type === 'dismissed') {

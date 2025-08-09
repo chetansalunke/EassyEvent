@@ -244,14 +244,6 @@ const ProfileScreen = ({ navigation }) => {
           <Ionicons name="arrow-back" size={24} color={colors.secondary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Profile</Text>
-        <TouchableOpacity
-          style={styles.editButton}
-          onPress={handleEditVenue}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="create-outline" size={24} color={colors.primary} />
-        </TouchableOpacity>
       </View>
 
       <ScrollView
