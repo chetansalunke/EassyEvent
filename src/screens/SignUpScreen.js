@@ -12,6 +12,7 @@ import {
   Image,
   StatusBar,
   Platform,
+  FlatList,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { colors } from '../utils/colors';
@@ -19,101 +20,27 @@ import { validateForm, validationRules } from '../utils/validation';
 import API_CONFIG from '../config/apiConfig';
 
 // Enhanced data for states and cities with comprehensive options
+
 const ENHANCED_STATES = [
-  'Andhra Pradesh',
-  'Arunachal Pradesh',
-  'Assam',
-  'Bihar',
-  'Chhattisgarh',
+  'Mumbai',
+  'Pune',
+  'Bengaluru',
   'Delhi',
-  'Goa',
-  'Gujarat',
-  'Haryana',
-  'Himachal Pradesh',
-  'Jharkhand',
-  'Karnataka',
-  'Kerala',
-  'Madhya Pradesh',
-  'Maharashtra',
-  'Manipur',
-  'Meghalaya',
-  'Mizoram',
-  'Nagaland',
-  'Odisha',
-  'Punjab',
-  'Rajasthan',
-  'Sikkim',
-  'Tamil Nadu',
-  'Telangana',
-  'Tripura',
-  'Uttar Pradesh',
-  'Uttarakhand',
-  'West Bengal',
+  'Kolkata',
+  'Chennai',
+  'Hyderabad',
+  'Ahmedabad',
+  'Nashik',
+  'Aurangabad',
 ];
 
 const ENHANCED_CITIES = [
-  'Agra',
-  'Ahmedabad',
-  'Ajmer',
-  'Amravati',
-  'Amritsar',
-  'Aurangabad',
-  'Bangalore',
-  'Bengaluru',
-  'Bhopal',
-  'Bhubaneswar',
-  'Chandigarh',
-  'Chennai',
-  'Coimbatore',
+  'Maharashtra',
   'Delhi',
-  'Dhanbad',
-  'Faridabad',
-  'Ghaziabad',
-  'Guwahati',
-  'Gwalior',
-  'Hyderabad',
-  'Indore',
-  'Jabalpur',
-  'Jaipur',
-  'Jalandhar',
-  'Jammu',
-  'Jamshedpur',
-  'Jodhpur',
-  'Kanpur',
-  'Kochi',
-  'Kolhapur',
-  'Kolkata',
-  'Kota',
-  'Kozhikode',
-  'Lucknow',
-  'Ludhiana',
-  'Madurai',
-  'Mangalore',
-  'Meerut',
-  'Mumbai',
-  'Mysore',
-  'Nagpur',
-  'Nashik',
-  'Navi Mumbai',
-  'New Delhi',
-  'Noida',
-  'Patna',
-  'Pune',
-  'Raipur',
-  'Rajkot',
-  'Ranchi',
-  'Salem',
-  'Srinagar',
-  'Surat',
-  'Thane',
-  'Thiruvananthapuram',
-  'Thrissur',
-  'Tiruchirappalli',
-  'Udaipur',
-  'Vadodara',
-  'Varanasi',
-  'Vijayawada',
-  'Visakhapatnam',
+  'West Bengal',
+  'Tamil Nadu',
+  'Telangana',
+  'Gujarat',
 ];
 
 const RATE_TYPES = ['per day', 'per hour'];
@@ -375,70 +302,87 @@ const SignUpScreen = ({ navigation }) => {
     isOpen,
     onToggle,
     error,
-  }) => (
-    <View style={styles.dropdownWrapper}>
+  }) => {
+    // Render item for FlatList
+    const renderItem = ({ item, index }) => (
       <TouchableOpacity
-        style={[styles.input, styles.dropdown, error && styles.inputError]}
-        onPress={onToggle}
+        style={[
+          styles.dropdownItem,
+          value === item && styles.selectedDropdownItem,
+          index === data.length - 1 && styles.dropdownItemLast,
+        ]}
+        onPress={() => {
+          onSelect(item);
+        }}
         activeOpacity={0.7}
       >
-        <Text style={value ? styles.inputText : styles.placeholder}>
-          {value || placeholder}
+        <Text
+          style={[
+            styles.dropdownItemText,
+            value === item && styles.selectedDropdownItemText,
+          ]}
+        >
+          {item}
         </Text>
-        <Ionicons
-          name={isOpen ? 'chevron-up' : 'chevron-down'}
-          size={20}
-          color={colors.gray}
-        />
+        {value === item && (
+          <Ionicons
+            name="checkmark"
+            size={20}
+            color={colors.primary}
+            style={styles.checkIcon}
+          />
+        )}
       </TouchableOpacity>
+    );
 
-      {isOpen && (
-        <View style={styles.dropdownList}>
-          <ScrollView
-            style={styles.dropdownScrollView}
-            showsVerticalScrollIndicator={true}
-            bounces={false}
-            scrollEnabled={true}
-            keyboardShouldPersistTaps="always"
-            nestedScrollEnabled={true}
-            contentContainerStyle={styles.dropdownContentContainer}
-          >
-            {data.map((item, index) => (
-              <TouchableOpacity
-                key={`${item}-${index}`}
-                style={[
-                  styles.dropdownItem,
-                  value === item && styles.selectedDropdownItem,
-                  index === data.length - 1 && styles.dropdownItemLast,
-                ]}
-                onPress={() => {
-                  onSelect(item);
-                }}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={[
-                    styles.dropdownItemText,
-                    value === item && styles.selectedDropdownItemText,
-                  ]}
-                >
-                  {item}
-                </Text>
-                {value === item && (
-                  <Ionicons
-                    name="checkmark"
-                    size={20}
-                    color={colors.primary}
-                    style={styles.checkIcon}
-                  />
-                )}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-    </View>
-  );
+    return (
+      <View style={styles.dropdownWrapper}>
+        <TouchableOpacity
+          style={[styles.input, styles.dropdown, error && styles.inputError]}
+          onPress={onToggle}
+          activeOpacity={0.7}
+        >
+          <Text style={value ? styles.inputText : styles.placeholder}>
+            {value || placeholder}
+          </Text>
+          <Ionicons
+            name={isOpen ? 'chevron-up' : 'chevron-down'}
+            size={20}
+            color={colors.gray}
+          />
+        </TouchableOpacity>
+
+        {isOpen && (
+          <View style={styles.dropdownList}>
+            <FlatList
+              data={data}
+              renderItem={renderItem}
+              keyExtractor={(item, index) => `${item}-${index}`}
+              style={styles.dropdownFlatList}
+              contentContainerStyle={styles.dropdownContentContainer}
+              showsVerticalScrollIndicator={true}
+              persistentScrollbar={true}
+              indicatorStyle="black"
+              scrollIndicatorInsets={{ right: 1 }}
+              bounces={true}
+              keyboardShouldPersistTaps="always"
+              nestedScrollEnabled={true}
+              removeClippedSubviews={false}
+              scrollEventThrottle={16}
+              getItemLayout={(data, index) => ({
+                length: 36,
+                offset: 36 * index,
+                index,
+              })}
+              initialNumToRender={8}
+              maxToRenderPerBatch={10}
+              windowSize={10}
+            />
+          </View>
+        )}
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -938,7 +882,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 0,
     borderBottomLeftRadius: 12,
     borderBottomRightRadius: 12,
-    maxHeight: 200,
+    maxHeight: 300,
     elevation: 5,
     shadowColor: '#000',
     shadowOffset: {
@@ -948,20 +892,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     zIndex: 1001,
+    paddingRight: 2, // Add padding for scrollbar space
   },
-  dropdownScrollView: {
-    maxHeight: 200,
+  dropdownFlatList: {
+    maxHeight: 300,
+    paddingRight: 4, // Additional padding for scrollbar
   },
   dropdownContentContainer: {
     paddingVertical: 4,
   },
   dropdownItem: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderBottomWidth: 0.5,
     borderBottomColor: colors.lightGray,
     backgroundColor: colors.background,
-    minHeight: 40,
+    minHeight: 36,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',

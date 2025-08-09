@@ -102,14 +102,7 @@ const VenueScreen = ({ navigation }) => {
     'Gujarat',
   ];
 
-  const RATE_TYPE_OPTIONS = [
-    'Per Day',
-    'Per Hour',
-    'Per Event',
-    'Per Function',
-    'Per Week',
-    'Per Month',
-  ];
+  const RATE_TYPE_OPTIONS = ['per day', 'per hour'];
 
   // Load venue details
   const loadVenueDetails = async () => {
@@ -816,8 +809,14 @@ const VenueScreen = ({ navigation }) => {
     isOpen,
     onToggle,
     error,
+    priority = false,
   }) => (
-    <View style={styles.dropdownWrapper}>
+    <View
+      style={[
+        styles.dropdownWrapper,
+        priority && styles.dropdownWrapperPriority,
+      ]}
+    >
       <TouchableOpacity
         style={[styles.formInput, styles.dropdown, error && styles.inputError]}
         onPress={onToggle}
@@ -834,25 +833,48 @@ const VenueScreen = ({ navigation }) => {
       </TouchableOpacity>
 
       {isOpen && (
-        <View style={styles.dropdownList}>
+        <View
+          style={[styles.dropdownList, priority && styles.dropdownListPriority]}
+        >
           <ScrollView
             style={styles.dropdownScrollView}
             nestedScrollEnabled={true}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={true}
-            bounces={false}
+            persistentScrollbar={true}
+            indicatorStyle="black"
+            scrollIndicatorInsets={{ right: 1 }}
+            bounces={true}
+            scrollEventThrottle={16}
+            removeClippedSubviews={false}
           >
             {data.map((item, index) => (
               <TouchableOpacity
                 key={index}
                 style={[
                   styles.dropdownItem,
+                  value === item && styles.selectedDropdownItem,
                   index === data.length - 1 && styles.dropdownItemLast,
                 ]}
                 onPress={() => onSelect(item)}
                 activeOpacity={0.7}
               >
-                <Text style={styles.dropdownItemText}>{item}</Text>
+                <Text
+                  style={[
+                    styles.dropdownItemText,
+                    value === item && styles.selectedDropdownItemText,
+                  ]}
+                >
+                  {item}
+                </Text>
+                {value === item && (
+                  <Ionicons
+                    name="checkmark"
+                    size={20}
+                    color={colors.primary}
+                    style={styles.checkIcon}
+                  />
+                )}
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -1437,6 +1459,7 @@ const VenueScreen = ({ navigation }) => {
                       onSelect={selectState}
                       isOpen={showStateDropdown}
                       onToggle={() => setShowStateDropdown(!showStateDropdown)}
+                      priority={true}
                     />
                   </View>
                 </View>
@@ -1491,6 +1514,7 @@ const VenueScreen = ({ navigation }) => {
                       onToggle={() =>
                         setShowRateTypeDropdown(!showRateTypeDropdown)
                       }
+                      priority={true}
                     />
                   </View>
                 </View>
@@ -1742,7 +1766,8 @@ const styles = StyleSheet.create({
     paddingTop: 20,
   },
   formSection: {
-    marginBottom: 24,
+    marginBottom: 32,
+    paddingBottom: 16,
   },
   formSectionTitle: {
     fontSize: 18,
@@ -1760,12 +1785,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
-    marginBottom: 16,
+    marginBottom: 24,
+    position: 'relative',
+    zIndex: 1,
   },
   formGroupHalf: {
     flex: 1,
     position: 'relative',
-    zIndex: 1,
+    zIndex: 10,
   },
   formLabel: {
     fontSize: 14,
@@ -1788,6 +1815,11 @@ const styles = StyleSheet.create({
   dropdownWrapper: {
     position: 'relative',
     zIndex: 1000,
+    elevation: 1000,
+  },
+  dropdownWrapperPriority: {
+    zIndex: 2000,
+    elevation: 2000,
   },
   dropdown: {
     flexDirection: 'row',
@@ -1814,23 +1846,31 @@ const styles = StyleSheet.create({
     borderTopWidth: 0,
     borderBottomLeftRadius: 12,
     borderBottomRightRadius: 12,
-    maxHeight: 150,
-    zIndex: 9999,
-    elevation: 10,
+    maxHeight: 200,
+    zIndex: 10000,
+    elevation: 15,
     shadowColor: colors.secondary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    paddingRight: 2, // Add padding for scrollbar space
+  },
+  dropdownListPriority: {
+    zIndex: 20000,
+    elevation: 25,
   },
   dropdownScrollView: {
     flexGrow: 1,
+    maxHeight: 200,
+    paddingRight: 4, // Additional padding for scrollbar
   },
   dropdownItem: {
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     backgroundColor: colors.background,
+    minHeight: 36,
   },
   dropdownItemLast: {
     borderBottomWidth: 0,
@@ -1839,6 +1879,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.secondary,
     lineHeight: 20,
+    flex: 1,
+  },
+  selectedDropdownItem: {
+    backgroundColor: colors.primary + '10',
+  },
+  selectedDropdownItemText: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  checkIcon: {
+    marginLeft: 8,
   },
   inputError: {
     borderColor: colors.error,
