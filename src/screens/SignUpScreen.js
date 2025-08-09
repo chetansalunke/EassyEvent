@@ -423,7 +423,7 @@ const SignUpScreen = ({ navigation }) => {
               </TouchableOpacity>
               <View style={styles.logoContainer}>
                 <Image
-                  source={require('../../assets/logo_original.png')}
+                  source={require('../../assets/logo.png')}
                   style={styles.logoImage}
                   resizeMode="contain"
                 />
