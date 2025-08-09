@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import { Calendar } from 'react-native-calendars';
 import { colors } from '../utils/colors';
 import { useAuth } from '../context/AuthContext';
 import { addEvent, updateEvent, getEventDetails } from '../utils/authUtils';
@@ -35,9 +35,9 @@ const EditBookingScreen = ({ navigation, route }) => {
   const [formData, setFormData] = useState({
     name: '',
     from_date: '',
-    from_time: '',
+    from_time: '09:00:00', // Default start time 9 AM
     to_date: '',
-    to_time: '',
+    to_time: '17:00:00', // Default end time 5 PM
     payment_status: 'pending',
     number_of_people: '',
     amount_received: '',
@@ -53,9 +53,36 @@ const EditBookingScreen = ({ navigation, route }) => {
     useState(false);
   const [currentDateField, setCurrentDateField] = useState('');
   const [currentTimeField, setCurrentTimeField] = useState('');
-  const [tempDate, setTempDate] = useState(new Date());
-  const [tempTime, setTempTime] = useState(new Date());
+  const [datePickerType, setDatePickerType] = useState(''); // 'from_date' or 'to_date'
   const [errors, setErrors] = useState({});
+
+  // Time options for selection
+  const timeOptions = [
+    { label: '12:00 AM', value: '00:00:00' },
+    { label: '1:00 AM', value: '01:00:00' },
+    { label: '2:00 AM', value: '02:00:00' },
+    { label: '3:00 AM', value: '03:00:00' },
+    { label: '4:00 AM', value: '04:00:00' },
+    { label: '5:00 AM', value: '05:00:00' },
+    { label: '6:00 AM', value: '06:00:00' },
+    { label: '7:00 AM', value: '07:00:00' },
+    { label: '8:00 AM', value: '08:00:00' },
+    { label: '9:00 AM', value: '09:00:00' },
+    { label: '10:00 AM', value: '10:00:00' },
+    { label: '11:00 AM', value: '11:00:00' },
+    { label: '12:00 PM', value: '12:00:00' },
+    { label: '1:00 PM', value: '13:00:00' },
+    { label: '2:00 PM', value: '14:00:00' },
+    { label: '3:00 PM', value: '15:00:00' },
+    { label: '4:00 PM', value: '16:00:00' },
+    { label: '5:00 PM', value: '17:00:00' },
+    { label: '6:00 PM', value: '18:00:00' },
+    { label: '7:00 PM', value: '19:00:00' },
+    { label: '8:00 PM', value: '20:00:00' },
+    { label: '9:00 PM', value: '21:00:00' },
+    { label: '10:00 PM', value: '22:00:00' },
+    { label: '11:00 PM', value: '23:00:00' },
+  ];
 
   // Load event data if editing
   useEffect(() => {
@@ -133,101 +160,46 @@ const EditBookingScreen = ({ navigation, route }) => {
 
   const openDatePicker = field => {
     setCurrentDateField(field);
-    const currentValue = formData[field];
-    let dateToSet = new Date();
-
-    if (currentValue && currentValue.trim() !== '') {
-      try {
-        dateToSet = new Date(currentValue);
-        // Check if date is valid
-        if (isNaN(dateToSet.getTime())) {
-          dateToSet = new Date();
-        }
-      } catch (error) {
-        dateToSet = new Date();
-      }
-    }
-
-    setTempDate(dateToSet);
+    setDatePickerType(field);
     setShowDatePicker(true);
   };
 
   const openTimePicker = field => {
     setCurrentTimeField(field);
-    const currentValue = formData[field];
-    let timeToSet = new Date();
-
-    if (currentValue && currentValue.trim() !== '') {
-      try {
-        const [hours, minutes] = currentValue.split(':').map(Number);
-        if (!isNaN(hours) && !isNaN(minutes)) {
-          timeToSet.setHours(hours, minutes, 0);
-        }
-      } catch (error) {
-        // Keep current time if parsing fails
-      }
-    }
-
-    setTempTime(timeToSet);
     setShowTimePicker(true);
   };
 
-  const handleDateChange = (event, selectedDate) => {
-    const isAndroid = Platform.OS === 'android';
+  const handleTimeSelect = time => {
+    setFormData(prev => ({ ...prev, [currentTimeField]: time.value }));
 
-    if (isAndroid) {
-      setShowDatePicker(false);
+    // Clear error if it exists
+    if (errors[currentTimeField]) {
+      setErrors(prev => ({ ...prev, [currentTimeField]: null }));
     }
 
-    if (selectedDate && currentDateField) {
-      const formattedDate = selectedDate.toISOString().split('T')[0];
-      setFormData(prev => ({ ...prev, [currentDateField]: formattedDate }));
-      setTempDate(selectedDate); // Update temp date
+    setShowTimePicker(false);
 
-      // Clear error if it exists
-      if (errors[currentDateField]) {
-        setErrors(prev => ({ ...prev, [currentDateField]: null }));
-      }
-
-      // Validate date order after a short delay to ensure state is updated
-      setTimeout(() => {
-        validateDateOrder(currentDateField, formattedDate);
-      }, 800);
-    }
-
-    if (Platform.OS === 'ios' && event.type === 'dismissed') {
-      setShowDatePicker(false);
-    }
+    // Validate date order after a short delay to ensure state is updated
+    setTimeout(() => {
+      validateDateOrder(currentTimeField, time.value);
+    }, 100);
   };
 
-  const handleTimeChange = (event, selectedTime) => {
-    const isAndroid = Platform.OS === 'android';
+  const handleDateSelect = day => {
+    const selectedDate = day.dateString;
+    setFormData(prev => ({ ...prev, [currentDateField]: selectedDate }));
 
-    if (isAndroid) {
-      setShowTimePicker(false);
+    // Clear error if it exists
+    if (errors[currentDateField]) {
+      setErrors(prev => ({ ...prev, [currentDateField]: null }));
     }
 
-    if (selectedTime && currentTimeField) {
-      const hours = selectedTime.getHours().toString().padStart(2, '0');
-      const minutes = selectedTime.getMinutes().toString().padStart(2, '0');
-      const formattedTime = `${hours}:${minutes}:00`;
-      setFormData(prev => ({ ...prev, [currentTimeField]: formattedTime }));
-      setTempTime(selectedTime); // Update temp time
+    setShowDatePicker(false);
 
-      // Clear error if it exists
-      if (errors[currentTimeField]) {
-        setErrors(prev => ({ ...prev, [currentTimeField]: null }));
-      }
-
-      // Validate date order after a short delay to ensure state is updated
-      setTimeout(() => {
-        validateDateOrder(currentTimeField, formattedTime);
-      }, 500);
-    }
-
-    if (Platform.OS === 'ios' && event.type === 'dismissed') {
-      setShowTimePicker(false);
-    }
+    // Validate date order after a short delay to ensure state is updated
+    setTimeout(() => {
+      validateDateOrder(currentDateField, selectedDate);
+    }, 100);
   };
 
   const validateDateOrder = (changedField, changedValue) => {
@@ -284,20 +256,8 @@ const EditBookingScreen = ({ navigation, route }) => {
 
   const formatDisplayTime = timeString => {
     if (!timeString || timeString.trim() === '') return 'Select Time';
-    try {
-      const [hours, minutes] = timeString.split(':');
-      if (!hours || !minutes) return 'Select Time';
-
-      const date = new Date();
-      date.setHours(parseInt(hours, 10), parseInt(minutes, 10));
-      return date.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
-      });
-    } catch (error) {
-      return 'Select Time';
-    }
+    const timeOption = timeOptions.find(option => option.value === timeString);
+    return timeOption ? timeOption.label : 'Select Time';
   };
 
   // Payment status selection handler
@@ -669,54 +629,125 @@ const EditBookingScreen = ({ navigation, route }) => {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Date Picker */}
-      {showDatePicker && (
-        <Modal
-          transparent={true}
-          animationType="slide"
-          visible={showDatePicker}
-          onRequestClose={() => setShowDatePicker(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.pickerModalContent}>
-              <DateTimePicker
-                value={tempDate}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={handleDateChange}
-                minimumDate={new Date()}
-                textColor={colors.secondary}
-                themeVariant="light"
-                style={styles.dateTimePicker}
-              />
-            </View>
+      {/* Date Picker Modal */}
+      <Modal
+        visible={showDatePicker}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowDatePicker(false)}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              onPress={() => setShowDatePicker(false)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>
+              Select {datePickerType === 'from_date' ? 'Start' : 'End'} Date
+            </Text>
+            <View style={{ width: 60 }} />
           </View>
-        </Modal>
-      )}
 
-      {/* Time Picker */}
-      {showTimePicker && (
-        <Modal
-          transparent={true}
-          animationType="slide"
-          visible={showTimePicker}
-          onRequestClose={() => setShowTimePicker(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.pickerModalContent}>
-              <DateTimePicker
-                value={tempTime}
-                mode="time"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={handleTimeChange}
-                textColor={colors.secondary}
-                themeVariant="light"
-                style={styles.dateTimePicker}
-              />
-            </View>
+          <View style={styles.modalContent}>
+            <Calendar
+              key={`date-picker-${datePickerType}-${showDatePicker}`}
+              onDayPress={handleDateSelect}
+              markingType={'simple'}
+              markedDates={{
+                [formData[datePickerType]]: {
+                  selected: true,
+                  selectedColor: colors.primary,
+                  selectedTextColor: colors.background,
+                },
+              }}
+              minimumDate={new Date().toISOString().split('T')[0]}
+              theme={{
+                backgroundColor: colors.background,
+                calendarBackground: colors.background,
+                textSectionTitleColor: colors.secondary,
+                selectedDayBackgroundColor: colors.primary,
+                selectedDayTextColor: colors.background,
+                todayTextColor: colors.primary,
+                dayTextColor: colors.secondary,
+                textDisabledColor: colors.gray,
+                dotColor: colors.primary,
+                arrowColor: colors.primary,
+                monthTextColor: colors.secondary,
+                indicatorColor: colors.primary,
+                textDayFontFamily: 'System',
+                textMonthFontFamily: 'System',
+                textDayHeaderFontFamily: 'System',
+                textDayFontWeight: '400',
+                textMonthFontWeight: 'bold',
+                textDayHeaderFontWeight: '400',
+                textDayFontSize: 16,
+                textMonthFontSize: 16,
+                textDayHeaderFontSize: 13,
+              }}
+            />
           </View>
-        </Modal>
-      )}
+        </SafeAreaView>
+      </Modal>
+
+      {/* Time Picker Modal */}
+      <Modal
+        visible={showTimePicker}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowTimePicker(false)}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              onPress={() => setShowTimePicker(false)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>
+              Select {currentTimeField === 'from_time' ? 'Start' : 'End'} Time
+            </Text>
+            <View style={{ width: 60 }} />
+          </View>
+
+          <ScrollView
+            style={styles.timePickerScrollView}
+            contentContainerStyle={styles.timePickerContent}
+            showsVerticalScrollIndicator={true}
+            bounces={true}
+            keyboardShouldPersistTaps="handled"
+          >
+            {timeOptions.map((time, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.timeOption,
+                  formData[currentTimeField] === time.value &&
+                    styles.selectedTimeOption,
+                ]}
+                onPress={() => handleTimeSelect(time)}
+              >
+                <Text
+                  style={[
+                    styles.timeOptionText,
+                    formData[currentTimeField] === time.value &&
+                      styles.selectedTimeOptionText,
+                  ]}
+                >
+                  {time.label}
+                </Text>
+                {formData[currentTimeField] === time.value && (
+                  <Ionicons name="checkmark" size={20} color={colors.primary} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -1038,6 +1069,63 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.secondary,
+  },
+  modalCancelText: {
+    fontSize: 16,
+    color: colors.gray,
+  },
+  modalContent: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  timePickerScrollView: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  timePickerContent: {
+    paddingTop: 20,
+    paddingBottom: 40, // Extra padding at bottom for better scrolling
+  },
+  timeOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  selectedTimeOption: {
+    backgroundColor: colors.primary + '10',
+  },
+  timeOptionText: {
+    fontSize: 16,
+    color: colors.secondary,
+  },
+  selectedTimeOptionText: {
+    fontSize: 16,
+    color: colors.primary,
+    fontWeight: '600',
   },
 });
 
