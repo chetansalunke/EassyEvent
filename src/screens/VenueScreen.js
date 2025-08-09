@@ -60,6 +60,11 @@ const VenueScreen = ({ navigation }) => {
   const [showImageGallery, setShowImageGallery] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
+  // Dropdown states
+  const [showCityDropdown, setShowCityDropdown] = useState(false);
+  const [showStateDropdown, setShowStateDropdown] = useState(false);
+  const [showRateTypeDropdown, setShowRateTypeDropdown] = useState(false);
+
   const [editFormData, setEditFormData] = useState({
     venue_name: '',
     phone: '',
@@ -73,6 +78,38 @@ const VenueScreen = ({ navigation }) => {
     rate_type: '',
   });
   const { user, token } = useAuth();
+
+  // Dropdown options
+  const CITY_OPTIONS = [
+    Mumbai,
+    Pune,
+    Bengaluru,
+    Delhi,
+    Kolkata,
+    Chennai,
+    Hyderabad,
+    Ahmedabad,
+    Nashik,
+    Aurangabad,
+  ];
+
+  const STATE_OPTIONS = [
+    'Maharashtra',
+    'Delhi',
+    'West Bengal',
+    'Tamil Nadu',
+    'Telangana',
+    'Gujarat',
+  ];
+
+  const RATE_TYPE_OPTIONS = [
+    'Per Day',
+    'Per Hour',
+    'Per Event',
+    'Per Function',
+    'Per Week',
+    'Per Month',
+  ];
 
   // Load venue details
   const loadVenueDetails = async () => {
@@ -741,6 +778,89 @@ const VenueScreen = ({ navigation }) => {
     }));
   };
 
+  // Dropdown selection handlers
+  const selectCity = city => {
+    handleFormInputChange('city', city);
+    setShowCityDropdown(false);
+    setShowStateDropdown(false);
+    setShowRateTypeDropdown(false);
+  };
+
+  const selectState = state => {
+    handleFormInputChange('state', state);
+    setShowStateDropdown(false);
+    setShowCityDropdown(false);
+    setShowRateTypeDropdown(false);
+  };
+
+  const selectRateType = rateType => {
+    handleFormInputChange('rate_type', rateType.toLowerCase());
+    setShowRateTypeDropdown(false);
+    setShowCityDropdown(false);
+    setShowStateDropdown(false);
+  };
+
+  // Close all dropdowns when scrolling
+  const closeAllDropdowns = () => {
+    setShowCityDropdown(false);
+    setShowStateDropdown(false);
+    setShowRateTypeDropdown(false);
+  };
+
+  // Simple dropdown component
+  const SimpleDropdown = ({
+    value,
+    placeholder,
+    data,
+    onSelect,
+    isOpen,
+    onToggle,
+    error,
+  }) => (
+    <View style={styles.dropdownWrapper}>
+      <TouchableOpacity
+        style={[styles.formInput, styles.dropdown, error && styles.inputError]}
+        onPress={onToggle}
+        activeOpacity={0.7}
+      >
+        <Text style={value ? styles.inputText : styles.placeholder}>
+          {value || placeholder}
+        </Text>
+        <Ionicons
+          name={isOpen ? 'chevron-up' : 'chevron-down'}
+          size={20}
+          color={colors.gray}
+        />
+      </TouchableOpacity>
+
+      {isOpen && (
+        <View style={styles.dropdownList}>
+          <ScrollView
+            style={styles.dropdownScrollView}
+            nestedScrollEnabled={true}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={true}
+            bounces={false}
+          >
+            {data.map((item, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.dropdownItem,
+                  index === data.length - 1 && styles.dropdownItemLast,
+                ]}
+                onPress={() => onSelect(item)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.dropdownItemText}>{item}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+    </View>
+  );
+
   const InfoCard = ({ title, children, icon }) => (
     <View style={styles.infoCard}>
       <View style={styles.cardHeader}>
@@ -1230,6 +1350,8 @@ const VenueScreen = ({ navigation }) => {
             <ScrollView
               style={styles.modalContent}
               showsVerticalScrollIndicator={false}
+              onScrollBeginDrag={closeAllDropdowns}
+              keyboardShouldPersistTaps="handled"
             >
               {/* Venue Information */}
               <View style={styles.formSection}>
@@ -1296,27 +1418,25 @@ const VenueScreen = ({ navigation }) => {
                 <View style={styles.formRow}>
                   <View style={styles.formGroupHalf}>
                     <Text style={styles.formLabel}>City</Text>
-                    <TextInput
-                      style={styles.formInput}
+                    <SimpleDropdown
                       value={editFormData.city}
-                      onChangeText={value =>
-                        handleFormInputChange('city', value)
-                      }
-                      placeholder="City"
-                      placeholderTextColor={colors.gray}
+                      placeholder="Select City"
+                      data={CITY_OPTIONS}
+                      onSelect={selectCity}
+                      isOpen={showCityDropdown}
+                      onToggle={() => setShowCityDropdown(!showCityDropdown)}
                     />
                   </View>
 
                   <View style={styles.formGroupHalf}>
                     <Text style={styles.formLabel}>State</Text>
-                    <TextInput
-                      style={styles.formInput}
+                    <SimpleDropdown
                       value={editFormData.state}
-                      onChangeText={value =>
-                        handleFormInputChange('state', value)
-                      }
-                      placeholder="State"
-                      placeholderTextColor={colors.gray}
+                      placeholder="Select State"
+                      data={STATE_OPTIONS}
+                      onSelect={selectState}
+                      isOpen={showStateDropdown}
+                      onToggle={() => setShowStateDropdown(!showStateDropdown)}
                     />
                   </View>
                 </View>
@@ -1337,20 +1457,6 @@ const VenueScreen = ({ navigation }) => {
               {/* Venue Details */}
               <View style={styles.formSection}>
                 <Text style={styles.formSectionTitle}>Venue Details</Text>
-
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>Seating Capacity</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={editFormData.seating_capacity}
-                    onChangeText={value =>
-                      handleFormInputChange('seating_capacity', value)
-                    }
-                    placeholder="e.g., 100-200"
-                    placeholderTextColor={colors.gray}
-                  />
-                </View>
-
                 <View style={styles.formRow}>
                   <View style={styles.formGroupHalf}>
                     <Text style={styles.formLabel}>Rate (₹)</Text>
@@ -1368,16 +1474,37 @@ const VenueScreen = ({ navigation }) => {
 
                   <View style={styles.formGroupHalf}>
                     <Text style={styles.formLabel}>Rate Type</Text>
-                    <TextInput
-                      style={styles.formInput}
-                      value={editFormData.rate_type}
-                      onChangeText={value =>
-                        handleFormInputChange('rate_type', value)
+                    <SimpleDropdown
+                      value={
+                        editFormData.rate_type
+                          ? RATE_TYPE_OPTIONS.find(
+                              option =>
+                                option.toLowerCase() ===
+                                editFormData.rate_type.toLowerCase(),
+                            ) || editFormData.rate_type
+                          : ''
                       }
-                      placeholder="per day/hour"
-                      placeholderTextColor={colors.gray}
+                      placeholder="Select Rate Type"
+                      data={RATE_TYPE_OPTIONS}
+                      onSelect={selectRateType}
+                      isOpen={showRateTypeDropdown}
+                      onToggle={() =>
+                        setShowRateTypeDropdown(!showRateTypeDropdown)
+                      }
                     />
                   </View>
+                </View>
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>Seating Capacity</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    value={editFormData.seating_capacity}
+                    onChangeText={value =>
+                      handleFormInputChange('seating_capacity', value)
+                    }
+                    placeholder="e.g., 100-200"
+                    placeholderTextColor={colors.gray}
+                  />
                 </View>
               </View>
             </ScrollView>
@@ -1633,10 +1760,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
+    marginBottom: 16,
   },
   formGroupHalf: {
     flex: 1,
-    marginBottom: 16,
+    position: 'relative',
+    zIndex: 1,
   },
   formLabel: {
     fontSize: 14,
@@ -1653,6 +1782,66 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: colors.background,
     color: colors.secondary,
+  },
+
+  // SimpleDropdown styles
+  dropdownWrapper: {
+    position: 'relative',
+    zIndex: 1000,
+  },
+  dropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  placeholder: {
+    color: colors.gray,
+    fontSize: 16,
+  },
+  inputText: {
+    color: colors.secondary,
+    fontSize: 16,
+    flex: 1,
+  },
+  dropdownList: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+    maxHeight: 150,
+    zIndex: 9999,
+    elevation: 10,
+    shadowColor: colors.secondary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+  },
+  dropdownScrollView: {
+    flexGrow: 1,
+  },
+  dropdownItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  dropdownItemLast: {
+    borderBottomWidth: 0,
+  },
+  dropdownItemText: {
+    fontSize: 16,
+    color: colors.secondary,
+    lineHeight: 20,
+  },
+  inputError: {
+    borderColor: colors.error,
   },
 
   // Image Gallery Styles
