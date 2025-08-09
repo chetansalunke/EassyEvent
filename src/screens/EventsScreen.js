@@ -42,7 +42,6 @@ const EventsScreen = ({ navigation }) => {
     search: '',
     fromDate: '2025-01-01',
     toDate: '2025-12-31',
-    limit: 50,
   });
   const { token } = useAuth();
 
@@ -63,7 +62,7 @@ const EventsScreen = ({ navigation }) => {
           setShowEventDetail(false);
           return true;
         }
-        if (showFilters) {
+        if (showFilters) {ß
           setShowFilters(false);
           return true;
         }
@@ -116,7 +115,6 @@ const EventsScreen = ({ navigation }) => {
       const queryParams = new URLSearchParams({
         search: filters.search,
         ordering: 'from_date',
-        limit: filters.limit.toString(),
         offset: '0',
         from_date__gte: filters.fromDate,
         from_date__lte: filters.toDate,
@@ -364,7 +362,6 @@ const EventsScreen = ({ navigation }) => {
       search: '',
       fromDate: '2025-01-01',
       toDate: '2025-12-31',
-      limit: 50,
     });
     setShowFilters(false);
     fetchEventsFromApi();
@@ -1025,19 +1022,6 @@ const EventsScreen = ({ navigation }) => {
                   value={filters.toDate}
                   onChangeText={text =>
                     setFilters({ ...filters, toDate: text })
-                  }
-                />
-              </View>
-
-              <View style={styles.filterSection}>
-                <Text style={styles.filterLabel}>Limit</Text>
-                <TextInput
-                  style={styles.filterInput}
-                  placeholder="Number of events to fetch"
-                  value={filters.limit.toString()}
-                  keyboardType="numeric"
-                  onChangeText={text =>
-                    setFilters({ ...filters, limit: parseInt(text) || 50 })
                   }
                 />
               </View>
