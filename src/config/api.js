@@ -1,4 +1,4 @@
-// API Configuration for EassyEvent App
+// API Configuration for EaseEvent App
 
 // Determine API base URL based on environment
 const API_BASE_URL = __DEV__

@@ -1,6 +1,6 @@
 /\*\*
 
-- SafeArea Implementation Guide for EassyEvent App
+- SafeArea Implementation Guide for EaseEvent App
 -
 - This guide shows how to properly implement safe area handling
 - across different types of screens in the app.

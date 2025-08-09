@@ -62,7 +62,8 @@ const EventsScreen = ({ navigation }) => {
           setShowEventDetail(false);
           return true;
         }
-        if (showFilters) {ß
+        if (showFilters) {
+          
           setShowFilters(false);
           return true;
         }
