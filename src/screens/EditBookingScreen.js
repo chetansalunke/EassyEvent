@@ -714,38 +714,38 @@ const EditBookingScreen = ({ navigation, route }) => {
             <View style={{ width: 60 }} />
           </View>
 
-          <ScrollView
-            style={styles.timePickerScrollView}
-            contentContainerStyle={styles.timePickerContent}
-            showsVerticalScrollIndicator={true}
-            bounces={true}
-            keyboardShouldPersistTaps="handled"
-          >
-            {timeOptions.map((time, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[
-                  styles.timeOption,
-                  formData[currentTimeField] === time.value &&
-                    styles.selectedTimeOption,
-                ]}
-                onPress={() => handleTimeSelect(time)}
-              >
-                <Text
+          <View style={styles.timePickerContainer}>
+            <View style={styles.timePickerGrid}>
+              {timeOptions.map((time, index) => (
+                <TouchableOpacity
+                  key={index}
                   style={[
-                    styles.timeOptionText,
+                    styles.timeOption,
                     formData[currentTimeField] === time.value &&
-                      styles.selectedTimeOptionText,
+                      styles.selectedTimeOption,
                   ]}
+                  onPress={() => handleTimeSelect(time)}
                 >
-                  {time.label}
-                </Text>
-                {formData[currentTimeField] === time.value && (
-                  <Ionicons name="checkmark" size={20} color={colors.primary} />
-                )}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+                  <Text
+                    style={[
+                      styles.timeOptionText,
+                      formData[currentTimeField] === time.value &&
+                        styles.selectedTimeOptionText,
+                    ]}
+                  >
+                    {time.label}
+                  </Text>
+                  {formData[currentTimeField] === time.value && (
+                    <Ionicons
+                      name="checkmark"
+                      size={16}
+                      color={colors.primary}
+                    />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
@@ -1097,33 +1097,41 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 20,
   },
-  timePickerScrollView: {
+  timePickerContainer: {
     flex: 1,
     paddingHorizontal: 20,
-  },
-  timePickerContent: {
     paddingTop: 20,
-    paddingBottom: 40, // Extra padding at bottom for better scrolling
+  },
+  timePickerGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingBottom: 20,
   },
   timeOption: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    width: '48%',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
     backgroundColor: colors.background,
   },
   selectedTimeOption: {
-    backgroundColor: colors.primary + '10',
+    backgroundColor: colors.primary + '15',
+    borderColor: colors.primary,
   },
   timeOptionText: {
-    fontSize: 16,
+    fontSize: 14,
     color: colors.secondary,
+    flex: 1,
   },
   selectedTimeOptionText: {
-    fontSize: 16,
+    fontSize: 14,
     color: colors.primary,
     fontWeight: '600',
   },
